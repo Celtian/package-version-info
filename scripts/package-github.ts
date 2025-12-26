@@ -1,4 +1,4 @@
-import { writeFileSync } from 'fs-extra';
+import { ensureDirSync, writeFileSync } from 'fs-extra';
 import { join, resolve } from 'path';
 
 const pkg = require(resolve(__dirname, '..', 'package.json'));
@@ -17,6 +17,8 @@ pkg.publishConfig = {
   registry: 'https://npm.pkg.github.com'
 };
 
-writeFileSync(join(__dirname, '..', 'dist', 'package.json'), JSON.stringify(pkg, null, 2));
+const distDir = join(__dirname, '..', 'dist');
+ensureDirSync(distDir);
+writeFileSync(join(distDir, 'package.json'), JSON.stringify(pkg, null, 2));
 
 console.log('\x1b[34m', `Package.json in dist/ modified with publishConfig and name.`, '\x1b[0m');
