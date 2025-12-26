@@ -12,7 +12,7 @@ pkg.bin = {
   "package-version-info": "bin/version_info"
 };
 
-pkg.name = '@celtian/ngx-fixed-footer';
+pkg.name = '@celtian/package-version-info';
 pkg.publishConfig = {
   registry: 'https://npm.pkg.github.com'
 };

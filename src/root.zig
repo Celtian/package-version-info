@@ -123,6 +123,12 @@ pub fn generateVersionInfo(allocator: std.mem.Allocator, package_json_path: []co
 
     logNewLine();
     log(Color.BRIGHT_GREEN, "✍️ ", "Writing to {s}...", .{output_path});
+
+    // Ensure parent directory exists
+    if (std.fs.path.dirname(output_path)) |dir_path| {
+        try std.fs.cwd().makePath(dir_path);
+    }
+
     const output_file = try std.fs.cwd().createFile(output_path, .{});
     defer output_file.close();
 
