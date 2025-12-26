@@ -9,7 +9,7 @@ pkg.packageManager = undefined;
 pkg.engines = undefined;
 pkg.files = undefined;
 pkg.bin = {
-  "version-info": "bin/version_info"
+  "package-version-info": "bin/version_info"
 };
 
 pkg.name = '@celtian/ngx-fixed-footer';

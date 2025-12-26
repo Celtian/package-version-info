@@ -1,5 +1,5 @@
 {
-  "name": "version-info",
+  "name": "package-version-info",
   "version": "0.0.0",
   "author": {
     "name": "Dominik Hladík",
@@ -39,20 +39,20 @@
     "tsx": "^4.21.0"
   },
   "bin": {
-    "version-info": "zig-out/bin/version_info"
+    "package-version-info": "zig-out/bin/version_info"
   },
   "packageManager": "yarn@1.22.22",
   "engines": {
     "node": ">=24 <26",
     "npm": "please-use-yarn"
   },
-  "homepage": "https://github.com/Celtian/version-info",
+  "homepage": "https://github.com/Celtian/package-version-info",
   "repository": {
-    "url": "git+https://github.com/Celtian/version-info.git",
+    "url": "git+https://github.com/Celtian/package-version-info.git",
     "type": "git"
   },
   "bugs": {
-    "url": "https://github.com/Celtian/version-info/issues"
+    "url": "https://github.com/Celtian/package-version-info/issues"
   },
   "keywords": [
     "version",
