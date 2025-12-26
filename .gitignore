@@ -34,3 +34,4 @@ Thumbs.db
 version-info.ts
 dist
 tmp
+src/package.json

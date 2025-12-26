@@ -1,6 +1,8 @@
 //! By convention, root.zig is the root source file when making a library.
 const std = @import("std");
 
+const embedded_package_json = @embedFile("package.json");
+
 const Color = struct {
     pub const RESET = "\x1b[0m";
     pub const BOLD = "\x1b[1m";
@@ -27,20 +29,17 @@ fn logNewLine() void {
     std.debug.print("\n", .{});
 }
 
-/// Prints version from package.json in a nicely formatted way
-pub fn printVersion(allocator: std.mem.Allocator, package_json_path: []const u8) !void {
-    const file = try std.fs.cwd().openFile(package_json_path, .{});
-    defer file.close();
-
-    const file_content = try file.readToEndAlloc(allocator, 1024 * 1024);
-    defer allocator.free(file_content);
-
-    const parsed = try std.json.parseFromSlice(std.json.Value, allocator, file_content, .{});
+/// Prints the tool's version from embedded package.json
+pub fn printToolVersion(allocator: std.mem.Allocator) !void {
+    const parsed = try std.json.parseFromSlice(std.json.Value, allocator, embedded_package_json, .{});
     defer parsed.deinit();
 
     const version = parsed.value.object.get("version").?.string;
+    const name = parsed.value.object.get("name").?.string;
+
     logNewLine();
-    log(Color.BRIGHT_CYAN, "📦", "Version: {s}", .{version});
+    log(Color.BRIGHT_CYAN, "📦", "{s}", .{name});
+    log(Color.BRIGHT_CYAN, "📌", "Version: {s}", .{version});
     logNewLine();
 }
 

@@ -16,6 +16,8 @@
     "clean": "rimraf zig-out dist",
     "prepare": "husky",
     "copy-files": "copyfiles -u 2 zig-out/bin/version_info dist/bin && copyfiles README.md LICENSE dist",
+    "postinstall": "yarn script:package-zig",
+    "script:package-zig": "yarn tsx ./scripts/package-zig.ts",
     "script:package-npm": "yarn tsx ./scripts/package-npm.ts",
     "script:package-github": "yarn tsx ./scripts/package-github.ts",
     "version": "auto-changelog -p && git add CHANGELOG.md",

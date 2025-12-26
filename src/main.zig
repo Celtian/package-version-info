@@ -19,7 +19,7 @@ pub fn main() !void {
     // Parse arguments
     while (args.next()) |arg| {
         if (std.mem.eql(u8, arg, "--version") or std.mem.eql(u8, arg, "-v")) {
-            try version_info.printVersion(allocator, "package.json");
+            try version_info.printToolVersion(allocator);
             return;
         } else if (std.mem.eql(u8, arg, "--input") or std.mem.eql(u8, arg, "-i")) {
             if (args.next()) |value| {
