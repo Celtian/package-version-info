@@ -1,0 +1,37 @@
+name: Test PR
+"on": pull_request
+
+jobs:
+  install-and-test:
+    name: 🛠️ Install & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🗜️ Checkout
+        uses: actions/checkout@v6
+
+      - name: 🗜️ Setup node version
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: "https://registry.npmjs.org"
+
+      - name: 🗜️ Setup Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.15.2
+
+      - name: 🛠️ Install
+        uses: ./.github/actions/cached-deps
+
+      - name: 🛠️ Clean temporary files
+        run: yarn clean
+
+      - name: 📦 Build
+        run: yarn build
+
+      - name: 🛠️ Setup package
+        run: yarn script:package-npm
+
+      - name: 🛠️ Copy files to dist
+        run: yarn copy-files
