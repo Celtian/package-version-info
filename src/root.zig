@@ -44,6 +44,13 @@ pub fn printVersion(allocator: std.mem.Allocator, package_json_path: []const u8)
     logNewLine();
 }
 
+/// Structure to hold author information
+pub const AuthorInfo = struct {
+    name: []const u8,
+    email: []const u8,
+    url: []const u8,
+};
+
 /// Structure to hold git information
 pub const GitInfo = struct {
     branch: []const u8,
@@ -118,22 +125,29 @@ fn writeTypescriptHeader(writer: anytype) !void {
 }
 
 /// Writes the VERSION_INFO export statement to the output
-fn writeVersionInfo(writer: anytype, version: []const u8, date_str: []const u8, git_info: ?GitInfo) !void {
+fn writeVersionInfo(writer: anytype, version: []const u8, date_str: []const u8, author_info: ?AuthorInfo, git_info: ?GitInfo) !void {
     try writer.print("export const VERSION_INFO = {{\n", .{});
     try writer.print("  version: \"{s}\",\n", .{version});
     try writer.print("  date: \"{s}\"", .{date_str});
+
+    if (author_info) |author| {
+        try writer.print(",\n", .{});
+        try writer.print("  author: {{\n", .{});
+        try writer.print("    name: \"{s}\",\n", .{author.name});
+        try writer.print("    email: \"{s}\",\n", .{author.email});
+        try writer.print("    url: \"{s}\"\n", .{author.url});
+        try writer.print("  }}", .{});
+    }
 
     if (git_info) |info| {
         try writer.print(",\n", .{});
         try writer.print("  git: {{\n", .{});
         try writer.print("    branch: \"{s}\",\n", .{info.branch});
         try writer.print("    commit: \"{s}\"\n", .{info.commit});
-        try writer.print("  }}\n", .{});
-    } else {
-        try writer.print("\n", .{});
+        try writer.print("  }}", .{});
     }
 
-    try writer.print("}};\n", .{});
+    try writer.print("\n}};\n", .{});
 }
 
 /// Formats a Unix timestamp in milliseconds to ISO 8601 format (YYYY-MM-DDTHH:MM:SS.sssZ)
@@ -192,6 +206,37 @@ pub fn generateVersionInfo(allocator: std.mem.Allocator, package_json_path: []co
     log(Color.BLUE, "📦", "Version: {s}", .{version});
 
     logNewLine();
+    log(Color.BRIGHT_BLUE, "👤", "Reading author info...", .{});
+    var author_info: ?AuthorInfo = null;
+    if (parsed.value.object.get("author")) |author_value| {
+        if (author_value == .object) {
+            const author_obj = author_value.object;
+            if (author_obj.get("name")) |name| {
+                const author_name = name.string;
+                const author_email = if (author_obj.get("email")) |email| email.string else "";
+                const author_url = if (author_obj.get("url")) |url| url.string else "";
+
+                author_info = AuthorInfo{
+                    .name = author_name,
+                    .email = author_email,
+                    .url = author_url,
+                };
+
+                log(Color.BRIGHT_BLUE, "✍️ ", "Name: {s}", .{author_name});
+                if (author_email.len > 0) {
+                    log(Color.BRIGHT_BLUE, "📧", "Email: {s}", .{author_email});
+                }
+                if (author_url.len > 0) {
+                    log(Color.BRIGHT_BLUE, "🔗", "URL: {s}", .{author_url});
+                }
+            }
+        }
+    }
+    if (author_info == null) {
+        log(Color.YELLOW, "⚠️ ", "No author info found in package.json", .{});
+    }
+
+    logNewLine();
     log(Color.CYAN, "⏰", "Generating timestamp...", .{});
     const millis = std.time.milliTimestamp();
     var date_buffer: [30]u8 = undefined;
@@ -225,7 +270,7 @@ pub fn generateVersionInfo(allocator: std.mem.Allocator, package_json_path: []co
     const writer = &stdout_writer.interface;
 
     try writeTypescriptHeader(writer);
-    try writeVersionInfo(writer, version, date_str, git_info);
+    try writeVersionInfo(writer, version, date_str, author_info, git_info);
 
     try writer.flush();
 
