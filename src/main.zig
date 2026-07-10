@@ -15,6 +15,7 @@ pub fn main() !void {
 
     var input_path: []const u8 = "package.json";
     var output_path: []const u8 = "version-info.ts";
+    var git_path: []const u8 = ".git";
 
     // Parse arguments
     while (args.next()) |arg| {
@@ -29,8 +30,12 @@ pub fn main() !void {
             if (args.next()) |value| {
                 output_path = value;
             }
+        } else if (std.mem.eql(u8, arg, "--git") or std.mem.eql(u8, arg, "-g")) {
+            if (args.next()) |value| {
+                git_path = value;
+            }
         }
     }
 
-    try version_info.generateVersionInfo(allocator, input_path, output_path);
+    try version_info.generateVersionInfo(allocator, input_path, output_path, git_path);
 }

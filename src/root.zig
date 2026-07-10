@@ -56,11 +56,13 @@ pub const GitInfo = struct {
     commit: []const u8,
 };
 
-/// Reads the current git branch and commit hash
-/// Returns null if not in a git repository
-pub fn getGitInfo(allocator: std.mem.Allocator) !?GitInfo {
-    // Read .git/HEAD to get the branch reference
-    const head_file = std.fs.cwd().openFile(".git/HEAD", .{}) catch |err| {
+/// Reads the current git branch and commit hash from a Git directory.
+/// Returns null if the directory is not a Git repository.
+pub fn getGitInfo(allocator: std.mem.Allocator, git_path: []const u8) !?GitInfo {
+    const head_path = try std.fs.path.join(allocator, &.{ git_path, "HEAD" });
+    defer allocator.free(head_path);
+
+    const head_file = std.fs.cwd().openFile(head_path, .{}) catch |err| {
         if (err == error.FileNotFound) {
             return null; // Not a git repository
         }
@@ -85,8 +87,7 @@ pub fn getGitInfo(allocator: std.mem.Allocator) !?GitInfo {
             branch = ref_path_raw[11..]; // Skip "refs/heads/"
         }
 
-        // Build the full path to the ref file (.git/refs/heads/branch-name)
-        const ref_path = try std.fmt.allocPrint(allocator, ".git/{s}", .{ref_path_raw});
+        const ref_path = try std.fs.path.join(allocator, &.{ git_path, ref_path_raw });
         defer allocator.free(ref_path);
 
         // Try to read the commit hash from the ref file
@@ -101,7 +102,9 @@ pub fn getGitInfo(allocator: std.mem.Allocator) !?GitInfo {
         } else |err| {
             if (err == error.FileNotFound) {
                 // Ref file not found, try packed-refs
-                const packed_refs_file = std.fs.cwd().openFile(".git/packed-refs", .{}) catch |packed_err| {
+                const packed_refs_path = try std.fs.path.join(allocator, &.{ git_path, "packed-refs" });
+                defer allocator.free(packed_refs_path);
+                const packed_refs_file = std.fs.cwd().openFile(packed_refs_path, .{}) catch |packed_err| {
                     if (packed_err == error.FileNotFound) {
                         return null; // Neither individual ref nor packed-refs found
                     }
@@ -216,7 +219,7 @@ fn formatTimestampISO8601(buffer: []u8, millis: i64) ![]const u8 {
 }
 
 /// Generates a version-info.ts file from package.json
-pub fn generateVersionInfo(allocator: std.mem.Allocator, package_json_path: []const u8, output_path: []const u8) !void {
+pub fn generateVersionInfo(allocator: std.mem.Allocator, package_json_path: []const u8, output_path: []const u8, git_path: []const u8) !void {
     const start_time = std.time.milliTimestamp();
     logNewLine();
     log(Color.YELLOW, "🚀", "Starting version info generation...", .{});
@@ -275,7 +278,7 @@ pub fn generateVersionInfo(allocator: std.mem.Allocator, package_json_path: []co
 
     logNewLine();
     log(Color.BRIGHT_MAGENTA, "🌿", "Reading git info...", .{});
-    const git_info = try getGitInfo(allocator);
+    const git_info = try getGitInfo(allocator, git_path);
 
     if (git_info) |info| {
         log(Color.BRIGHT_MAGENTA, "📍", "Branch: {s}", .{info.branch});
