@@ -34,8 +34,11 @@ npx package-version-info
 # Show version
 npx package-version-info --version
 
-# Custom paths
-npx package-version-info --input package.json --output src/version-info.ts
+# Custom paths (.git is the default Git directory)
+npx package-version-info --input package.json --output src/version-info.ts --git ../.git
+
+# Short options
+npx package-version-info -i package.json -o src/version-info.ts -g ../.git
 ```
 
 ### Output Example
@@ -142,7 +145,7 @@ zig build
 zig build run
 
 # Run with arguments
-zig build run -- --input package.json --output version-info.ts
+zig build run -- --input package.json --output version-info.ts --git .git
 
 # Run tests
 zig build test
@@ -168,6 +171,6 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 🪪 License
 
-Copyright &copy; 2025 [Dominik Hladik](https://github.com/Celtian)
+Copyright &copy; 2025 - 2026 [Dominik Hladik](https://github.com/Celtian)
 
 All contents are licensed under the [MIT license](LICENSE).
