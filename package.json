@@ -15,7 +15,7 @@
     "build": "zig build",
     "start": "zig build run -- generate",
     "test": "zig build test",
-    "coverage": "rimraf coverage && zig build coverage",
+    "coverage:build": "rimraf coverage zig-out/coverage-tests && zig build coverage",
     "clean": "rimraf zig-out dist",
     "prepare": "husky",
     "copy-files": "copyfiles -u 2 zig-out/bin/version_info dist/bin && copyfiles README.md LICENSE dist",
