@@ -11,9 +11,9 @@
   "description": "Generate version info from package.json for TypeScript projects",
   "scripts": {
     "validate": "yarn format:check && yarn build && yarn test",
-    "format:check": "zig fmt --check src/root.zig src/main.zig build.zig",
+    "format:check": "zig fmt --check src/root.zig src/main.zig src/cli.zig build.zig",
     "build": "zig build",
-    "start": "zig build run",
+    "start": "zig build run -- generate",
     "test": "zig build test",
     "clean": "rimraf zig-out dist",
     "prepare": "husky",

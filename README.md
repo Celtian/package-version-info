@@ -1,176 +1,215 @@
-# Package Version Info
+<div align="center">
 
-[![npm version](https://badge.fury.io/js/package-version-info.svg)](https://badge.fury.io/js/package-version-info)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+# 📦 Package Version Info
 
-A blazingly fast CLI tool written in Zig that generates TypeScript version information files from your `package.json`. Perfect for embedding version, build date, and git information into your applications.
+**Generate a TypeScript build-info constant from `package.json` and Git in milliseconds.**
 
-## ✨ Features
+[![npm version](https://badge.fury.io/js/package-version-info.svg)](https://www.npmjs.com/package/package-version-info)
+[![Test PR](https://github.com/Celtian/package-version-info/actions/workflows/pull-request.yml/badge.svg)](https://github.com/Celtian/package-version-info/actions/workflows/pull-request.yml)
+[![Zig 0.16.0](https://img.shields.io/badge/Zig-0.16.0-F7A41D?logo=zig&logoColor=white)](https://ziglang.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-- 🚀 **Fast**: Written in Zig for maximum performance
-- 📦 **Zero Dependencies**: No runtime dependencies required
-- 👤 **Author Information**: Extracts author details from package.json
-- 🌿 **Git Integration**: Automatically extracts branch and commit information
-- ⚡ **TypeScript Output**: Generates type-safe TypeScript constants
-- 🎯 **Graceful Degradation**: Works with or without a git repository or author info
-- 🔧 **Configurable**: Customize input and output paths
+<img
+  src="https://raw.githubusercontent.com/Celtian/package-version-info/master/docs/assets/terminal-demo.gif"
+  alt="Package Version Info terminal demo"
+  width="900"
+/>
 
-## 🚀 Quick Start
+</div>
 
-### Installation
+`package-version-info` is a fast native CLI for embedding your package version, build date,
+author, Git branch, and commit into TypeScript applications. It has no runtime dependencies and
+gracefully omits optional metadata when it is unavailable.
+
+## ✨ Why use it?
+
+| | |
+| --- | --- |
+| ⚡ **Fast native executable** | Built with Zig and starts without a JavaScript runtime. |
+| 📦 **Zero runtime dependencies** | Installs as a standalone executable for your platform. |
+| 🧩 **TypeScript-ready output** | Generates a directly importable `VERSION_INFO` constant. |
+| 🌿 **Optional Git metadata** | Reads loose refs, packed refs, and detached HEAD states. |
+| 👤 **Package author metadata** | Includes author name, email, and URL when available. |
+| 🧘 **Quiet by default** | Prints one compact result line, with `--verbose` when you need details. |
+
+## 🚀 Quick start
+
+### 1. Install
 
 ```bash
 npm install package-version-info --save-dev
-# or
+```
+
+```bash
 yarn add package-version-info --dev
 ```
 
-### Usage
+### 2. Generate the file
 
 ```bash
-# Generate version-info.ts from package.json
-npx package-version-info
-
-# Show version
-npx package-version-info --version
-
-# Custom paths (.git is the default Git directory)
-npx package-version-info --input package.json --output src/version-info.ts --git ../.git
-
-# Short options
-npx package-version-info -i package.json -o src/version-info.ts -g ../.git
+npx package-version-info generate --output src/version-info.ts
 ```
 
-### Output Example
-
-**Full Output (with author and git):**
-
-```typescript
-export const VERSION_INFO = {
-  version: "1.0.0",
-  date: "2025-12-26T16:00:00.000Z",
-  author: {
-    name: "Dominik Hladík",
-    email: "dominik.hladik@seznam.cz",
-    url: "https://github.com/Celtian",
-  },
-  git: {
-    branch: "master",
-    commit: "324822ac3893dd6159ab8cb4477d45edeacf11f6",
-  },
-};
+```text
+✅ Generated src/version-info.ts (v1.0.0, 2ms)
 ```
 
-**Minimal Output (without author and git):**
-
-```typescript
-export const VERSION_INFO = {
-  version: "1.0.0",
-  date: "2025-12-26T16:00:00.000Z",
-};
-```
-
-## 📖 Usage in Your Application
-
-Once generated, import and use the version info in your application:
+### 3. Import it
 
 ```typescript
 import { VERSION_INFO } from "./version-info";
 
-console.log(`Version: ${VERSION_INFO.version}`);
-console.log(`Build Date: ${VERSION_INFO.date}`);
-
-if (VERSION_INFO.author) {
-  console.log(`Author: ${VERSION_INFO.author.name}`);
-  console.log(`Email: ${VERSION_INFO.author.email}`);
-  console.log(`URL: ${VERSION_INFO.author.url}`);
-}
-
-if (VERSION_INFO.git) {
-  console.log(`Branch: ${VERSION_INFO.git.branch}`);
-  console.log(`Commit: ${VERSION_INFO.git.commit}`);
-}
+console.log(`Version ${VERSION_INFO.version}`);
+console.log(`Built at ${VERSION_INFO.date}`);
 ```
 
-## 🔧 CLI Options
+## 📝 Generated output
 
-| Option      | Alias | Default           | Description                    |
-| ----------- | ----- | ----------------- | ------------------------------ |
-| `--version` | `-v`  | -                 | Display version information    |
-| `--input`   | `-i`  | `package.json`    | Path to package.json file      |
-| `--output`  | `-o`  | `version-info.ts` | Path to output TypeScript file |
+```typescript
+/**
+ * Generated by script 🍺
+ * Do not edit manually.
+ */
 
-## 🛠️ Integration with Build Tools
-
-### NPM Scripts
-
-Add to your `package.json`:
-
-```json
-{
-  "scripts": {
-    "prebuild": "package-version-info",
-    "build": "your-build-command"
+export const VERSION_INFO = {
+  version: "1.0.0",
+  date: "2026-07-16T18:53:01.908Z",
+  author: {
+    name: "Dominik Hladík",
+    email: "dominik.hladik@seznam.cz",
+    url: "https://github.com/Celtian"
+  },
+  git: {
+    branch: "main",
+    commit: "8be6ca60256cc90e0a41d40b9ee222165f239444"
   }
-}
+};
 ```
 
-### With TypeScript Projects
+The `author` property is omitted when `package.json` has no object-style author metadata. The
+`git` property is omitted when the configured Git directory or ref cannot be resolved.
+
+## 🧭 CLI reference
+
+Running the CLI without arguments displays help:
+
+```bash
+npx package-version-info
+```
+
+### Commands
+
+| Command | Description |
+| --- | --- |
+| `generate` | Generate the TypeScript version information file. |
+
+### Options
+
+| Option | Alias | Default | Description |
+| --- | --- | --- | --- |
+| `--help` | `-h` | — | Display usage information. |
+| `--version` | `-v` | — | Display the installed package version. |
+| `--verbose` | — | Disabled | Display detailed generation progress. |
+| `--input <path>` | `-i` | `package.json` | Input package file. |
+| `--output <path>` | `-o` | `version-info.ts` | Generated TypeScript file. |
+| `--git <path>` | `-g` | `.git` | Git directory used for branch and commit metadata. |
+
+### Common examples
+
+```bash
+# Generate with default paths
+npx package-version-info generate
+
+# Show detailed progress
+npx package-version-info generate --verbose
+
+# Use custom paths
+npx package-version-info generate \
+  --input package.json \
+  --output src/generated/version-info.ts \
+  --git .git
+
+# Short aliases
+npx package-version-info generate \
+  -i package.json \
+  -o src/generated/version-info.ts \
+  -g .git
+```
+
+Flag-only generation remains supported for existing scripts:
+
+```bash
+npx package-version-info --output src/version-info.ts
+```
+
+## 🎨 Compact and verbose logging
+
+Compact mode is designed for normal builds:
+
+```text
+✅ Generated src/version-info.ts (v1.0.0, 2ms)
+```
+
+Use verbose mode when diagnosing package, author, timestamp, Git, or output-path behavior:
+
+```bash
+npx package-version-info generate --verbose
+```
+
+## 🛠️ Build-tool integration
+
+Generate version information automatically before your application build:
 
 ```json
 {
   "scripts": {
-    "version-info": "package-version-info --output src/version-info.ts",
+    "version-info": "package-version-info generate --output src/version-info.ts",
     "prebuild": "npm run version-info",
     "build": "tsc"
   }
 }
 ```
 
+The generated file is regular TypeScript, so the same approach works with Angular, React, Vue,
+Vite, Node.js, and other TypeScript-based build systems.
+
 ## 🏗️ Development
 
-This project is written in Zig. To build from source:
+Requirements:
 
-### Prerequisites
-
-- [Zig](https://ziglang.org/) >= 0.16.0
-
-### Build Commands
+- [Zig 0.16.0](https://ziglang.org/download/)
+- Node.js 24
+- Yarn 1.22.22
 
 ```bash
 # Build the executable
 zig build
 
-# Run the executable
-zig build run
+# Run the CLI
+zig build run -- generate
 
-# Run with arguments
-zig build run -- --input package.json --output version-info.ts --git .git
-
-# Run tests
-zig build test
-
-# Clean build artifacts
-rm -rf zig-cache zig-out
+# Run all formatting, build, and test checks
+yarn validate
 ```
 
-## 🎯 Why Zig?
+<details>
+<summary><strong>Regenerate the terminal demo</strong></summary>
 
-- **Performance**: Compiled binary with minimal overhead
-- **Size**: Small executable footprint
-- **Cross-platform**: Easy to build for multiple platforms
-- **Memory Safety**: No runtime exceptions or undefined behavior
+The animation is defined in [`docs/terminal-demo.tape`](docs/terminal-demo.tape) and rendered with
+[VHS](https://github.com/charmbracelet/vhs). The official Docker image includes VHS and its media
+dependencies:
 
-## 📦 Dependencies
+```bash
+zig build
+docker run --rm -v "$PWD:/vhs" ghcr.io/charmbracelet/vhs docs/terminal-demo.tape
+```
 
-_None_ - This is a standalone binary with zero runtime dependencies.
+</details>
 
-## 🤝 Contributing
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+## 📄 License
 
-## 🪪 License
+Copyright &copy; 2025–2026 [Dominik Hladík](https://github.com/Celtian).
 
-Copyright &copy; 2025 - 2026 [Dominik Hladik](https://github.com/Celtian)
-
-All contents are licensed under the [MIT license](LICENSE).
+Licensed under the [MIT License](LICENSE).

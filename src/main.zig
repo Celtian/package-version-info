@@ -1,26 +1,48 @@
 const std = @import("std");
+const cli = @import("cli");
 const version_info = @import("version_info");
 
 pub fn main(init: std.process.Init) !void {
     var args = init.minimal.args.iterate();
     _ = args.next();
 
-    var input_path: []const u8 = "package.json";
-    var output_path: []const u8 = "version-info.ts";
-    var git_path: []const u8 = ".git";
-
-    while (args.next()) |arg| {
-        if (std.mem.eql(u8, arg, "--version") or std.mem.eql(u8, arg, "-v")) {
-            try version_info.printToolVersion(init.gpa);
-            return;
-        } else if (std.mem.eql(u8, arg, "--input") or std.mem.eql(u8, arg, "-i")) {
-            if (args.next()) |value| input_path = value;
-        } else if (std.mem.eql(u8, arg, "--output") or std.mem.eql(u8, arg, "-o")) {
-            if (args.next()) |value| output_path = value;
-        } else if (std.mem.eql(u8, arg, "--git") or std.mem.eql(u8, arg, "-g")) {
-            if (args.next()) |value| git_path = value;
-        }
+    switch (cli.parse(&args)) {
+        .help => try printHelp(init.io),
+        .version => try version_info.printToolVersion(init.gpa),
+        .invalid => |invalid| {
+            var stderr_buffer: [4096]u8 = undefined;
+            var stderr_writer = std.Io.File.stderr().writer(init.io, &stderr_buffer);
+            try cli.writeInvalidArgument(&stderr_writer.interface, invalid);
+            try cli.writeHelp(&stderr_writer.interface);
+            try stderr_writer.interface.flush();
+            std.process.exit(2);
+        },
+        .generate => |options| {
+            if (options.verbose) {
+                try version_info.generateVersionInfoWithOptions(
+                    init.gpa,
+                    init.io,
+                    options.input_path,
+                    options.output_path,
+                    options.git_path,
+                    .{ .verbose = true },
+                );
+            } else {
+                try version_info.generateVersionInfo(
+                    init.gpa,
+                    init.io,
+                    options.input_path,
+                    options.output_path,
+                    options.git_path,
+                );
+            }
+        },
     }
+}
 
-    try version_info.generateVersionInfo(init.gpa, init.io, input_path, output_path, git_path);
+fn printHelp(io: std.Io) !void {
+    var stderr_buffer: [4096]u8 = undefined;
+    var stderr_writer = std.Io.File.stderr().writer(io, &stderr_buffer);
+    try cli.writeHelp(&stderr_writer.interface);
+    try stderr_writer.interface.flush();
 }
