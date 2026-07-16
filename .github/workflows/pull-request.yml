@@ -1,6 +1,10 @@
 name: Test PR
 "on": pull_request
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   install-and-test:
     name: 🛠️ Install & Test
@@ -29,6 +33,20 @@ jobs:
 
       - name: ✅ Validate
         run: yarn validate
+
+      - name: 🗜️ Install coverage tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes kcov
+
+      - name: ✅ Generate coverage
+        run: yarn coverage
+
+      - name: 📊 Report coverage
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        uses: ./.github/actions/report-pr
+        with:
+          coverage-file: coverage/merged/kcov-merged/cobertura.xml
 
       - name: 🛠️ Setup package
         run: yarn script:package-npm
