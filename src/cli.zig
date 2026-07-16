@@ -59,7 +59,7 @@ pub fn parse(args: anytype) Action {
 
 pub fn writeHelp(writer: anytype) !void {
     try writer.writeAll(
-        color.bright_cyan ++ "Package Version Info" ++ color.reset ++
+        "\n" ++ color.bright_cyan ++ "Package Version Info" ++ color.reset ++
             "\n\n" ++ color.yellow ++ "Usage:" ++ color.reset ++
             "\n  package-version-info [options]" ++
             "\n\n" ++ color.yellow ++ "Options:" ++ color.reset ++
@@ -75,7 +75,7 @@ pub fn writeHelp(writer: anytype) !void {
             "            Output TypeScript file (default: version-info.ts)." ++
             "\n  " ++ color.green ++ "-g, --git <path>" ++ color.reset ++
             "               Git directory (default: .git)." ++
-            "\n",
+            "\n\n",
     );
 }
 
@@ -173,6 +173,8 @@ test "help contains usage commands and options" {
 
     try writeHelp(&output.writer);
     const help = output.writer.buffered();
+    try std.testing.expect(std.mem.startsWith(u8, help, "\n"));
+    try std.testing.expect(std.mem.endsWith(u8, help, "\n\n"));
     try std.testing.expect(std.mem.indexOf(u8, help, "Usage:") != null);
     try std.testing.expect(std.mem.indexOf(u8, help, "Options:") != null);
     try std.testing.expect(std.mem.indexOf(u8, help, "Commands:") == null);
