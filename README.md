@@ -23,7 +23,7 @@ gracefully omits optional metadata when it is unavailable.
 
 ## ✨ Why use it?
 
-| | |
+| Feature | Details |
 | --- | --- |
 | ⚡ **Fast native executable** | Built with Zig and starts without a JavaScript runtime. |
 | 📦 **Zero runtime dependencies** | Installs as a standalone executable for your platform. |
