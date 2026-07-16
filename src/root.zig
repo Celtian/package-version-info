@@ -2,7 +2,7 @@
 const std = @import("std");
 
 const embedded_package_json = @embedFile("package.json");
-const compact_summary_format = "✅ Generated {s} (v{s}, {d}ms)";
+const compact_summary_format = "✅ Generated {s} (v{s}, {d:.2}ms)";
 
 const color = struct {
     const reset = "\x1b[0m";
@@ -23,11 +23,11 @@ fn logNewLine() void {
     std.debug.print("\n", .{});
 }
 
-fn writeCompactSummary(writer: anytype, output_path: []const u8, version: []const u8, duration_ms: i64) !void {
+fn writeCompactSummary(writer: anytype, output_path: []const u8, version: []const u8, duration_ms: f64) !void {
     try writer.print(compact_summary_format, .{ output_path, version, duration_ms });
 }
 
-fn logCompactSummary(output_path: []const u8, version: []const u8, duration_ms: i64) void {
+fn logCompactSummary(output_path: []const u8, version: []const u8, duration_ms: f64) void {
     std.debug.print("{s}" ++ compact_summary_format ++ "{s}\n", .{
         color.bright_green,
         output_path,
@@ -300,11 +300,12 @@ pub fn generateVersionInfoWithOptions(
     try writer.flush();
 
     const end_time = std.Io.Clock.awake.now(io);
-    const duration_ms = start_time.durationTo(end_time).toMilliseconds();
+    const duration_ns = start_time.durationTo(end_time).toNanoseconds();
+    const duration_ms = @as(f64, @floatFromInt(duration_ns)) / std.time.ns_per_ms;
     if (options.verbose) {
         log(color.bright_green, "✅", "Successfully generated {s}", .{output_path});
         logNewLine();
-        log(color.yellow, "⏱️ ", "Duration: {d}ms", .{duration_ms});
+        log(color.yellow, "⏱️ ", "Duration: {d:.2}ms", .{duration_ms});
         logNewLine();
     } else {
         logCompactSummary(output_path, version, duration_ms);
@@ -348,7 +349,7 @@ test "writes compact generation summary" {
 
     try writeCompactSummary(&output.writer, "generated/version-info.ts", "0.0.0", 2);
     try std.testing.expectEqualStrings(
-        "✅ Generated generated/version-info.ts (v0.0.0, 2ms)",
+        "✅ Generated generated/version-info.ts (v0.0.0, 2.00ms)",
         output.writer.buffered(),
     );
 }
