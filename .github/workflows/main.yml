@@ -28,7 +28,7 @@ jobs:
       - name: 🗜️ Setup Zig
         uses: mlugg/setup-zig@v2
         with:
-          version: 0.15.2
+          version: 0.16.0
 
       - name: 🛠️ Install
         uses: ./.github/actions/cached-deps
@@ -36,8 +36,8 @@ jobs:
       - name: 🛠️ Clean temporary files
         run: yarn clean
 
-      - name: 📦 Build
-        run: yarn build
+      - name: ✅ Validate
+        run: yarn validate
 
       - name: 🛠️ Setup package
         run: yarn script:package-npm
