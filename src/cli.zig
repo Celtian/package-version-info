@@ -29,50 +29,39 @@ pub const Action = union(enum) {
 
 pub fn parse(args: anytype) Action {
     var options: GenerateOptions = .{};
-    var generate = false;
 
     while (args.next()) |arg| {
         if (std.mem.eql(u8, arg, "--help") or std.mem.eql(u8, arg, "-h")) {
             return .help;
         } else if (std.mem.eql(u8, arg, "--version") or std.mem.eql(u8, arg, "-v")) {
             return .version;
-        } else if (std.mem.eql(u8, arg, "generate")) {
-            generate = true;
         } else if (std.mem.eql(u8, arg, "--verbose")) {
             options.verbose = true;
-            generate = true;
         } else if (std.mem.eql(u8, arg, "--input") or std.mem.eql(u8, arg, "-i")) {
             const value = args.next() orelse return .{ .invalid = .{ .missing_value = arg } };
             if (std.mem.startsWith(u8, value, "-")) return .{ .invalid = .{ .missing_value = arg } };
             options.input_path = value;
-            generate = true;
         } else if (std.mem.eql(u8, arg, "--output") or std.mem.eql(u8, arg, "-o")) {
             const value = args.next() orelse return .{ .invalid = .{ .missing_value = arg } };
             if (std.mem.startsWith(u8, value, "-")) return .{ .invalid = .{ .missing_value = arg } };
             options.output_path = value;
-            generate = true;
         } else if (std.mem.eql(u8, arg, "--git") or std.mem.eql(u8, arg, "-g")) {
             const value = args.next() orelse return .{ .invalid = .{ .missing_value = arg } };
             if (std.mem.startsWith(u8, value, "-")) return .{ .invalid = .{ .missing_value = arg } };
             options.git_path = value;
-            generate = true;
         } else {
             return .{ .invalid = .{ .unknown = arg } };
         }
     }
 
-    return if (generate) .{ .generate = options } else .help;
+    return .{ .generate = options };
 }
 
 pub fn writeHelp(writer: anytype) !void {
     try writer.writeAll(
         color.bright_cyan ++ "Package Version Info" ++ color.reset ++
             "\n\n" ++ color.yellow ++ "Usage:" ++ color.reset ++
-            "\n  package-version-info generate [options]" ++
-            "\n  package-version-info [generation options]" ++
-            "\n\n" ++ color.yellow ++ "Commands:" ++ color.reset ++
-            "\n  " ++ color.green ++ "generate" ++ color.reset ++
-            "                       Generate TypeScript version information." ++
+            "\n  package-version-info [options]" ++
             "\n\n" ++ color.yellow ++ "Options:" ++ color.reset ++
             "\n  " ++ color.green ++ "-h, --help" ++ color.reset ++
             "                     Display usage information." ++
@@ -119,11 +108,17 @@ fn parseTest(args: []const []const u8) Action {
     return parse(&iterator);
 }
 
-test "no arguments and help flags show help" {
-    try std.testing.expectEqual(.help, std.meta.activeTag(parseTest(&.{})));
+test "no arguments generate with default paths" {
+    const options = parseTest(&.{}).generate;
+    try std.testing.expectEqualStrings("package.json", options.input_path);
+    try std.testing.expectEqualStrings("version-info.ts", options.output_path);
+    try std.testing.expectEqualStrings(".git", options.git_path);
+    try std.testing.expect(!options.verbose);
+}
+
+test "help flags show help" {
     try std.testing.expectEqual(.help, std.meta.activeTag(parseTest(&.{"-h"})));
     try std.testing.expectEqual(.help, std.meta.activeTag(parseTest(&.{"--help"})));
-    try std.testing.expectEqual(.help, std.meta.activeTag(parseTest(&.{ "generate", "--help" })));
 }
 
 test "version flags show version" {
@@ -131,16 +126,7 @@ test "version flags show version" {
     try std.testing.expectEqual(.version, std.meta.activeTag(parseTest(&.{"--version"})));
 }
 
-test "generate command uses default paths" {
-    const action = parseTest(&.{"generate"});
-    const options = action.generate;
-    try std.testing.expectEqualStrings("package.json", options.input_path);
-    try std.testing.expectEqualStrings("version-info.ts", options.output_path);
-    try std.testing.expectEqualStrings(".git", options.git_path);
-    try std.testing.expect(!options.verbose);
-}
-
-test "legacy generation options remain supported" {
+test "generation options are parsed" {
     const action = parseTest(&.{
         "--verbose",
         "--input",
@@ -157,18 +143,18 @@ test "legacy generation options remain supported" {
     try std.testing.expect(options.verbose);
 }
 
-test "verbose triggers generation with or without command" {
-    const legacy = parseTest(&.{"--verbose"}).generate;
-    try std.testing.expect(legacy.verbose);
-    try std.testing.expectEqualStrings("package.json", legacy.input_path);
-
-    const command = parseTest(&.{ "generate", "--verbose" }).generate;
-    try std.testing.expect(command.verbose);
+test "verbose enables detailed generation progress" {
+    const options = parseTest(&.{"--verbose"}).generate;
+    try std.testing.expect(options.verbose);
+    try std.testing.expectEqualStrings("package.json", options.input_path);
 }
 
 test "unknown argument is invalid" {
     const action = parseTest(&.{"--unknown"});
     try std.testing.expectEqualStrings("--unknown", action.invalid.unknown);
+
+    const removed_command = parseTest(&.{"generate"});
+    try std.testing.expectEqualStrings("generate", removed_command.invalid.unknown);
 }
 
 test "options require values" {
@@ -188,8 +174,9 @@ test "help contains usage commands and options" {
     try writeHelp(&output.writer);
     const help = output.writer.buffered();
     try std.testing.expect(std.mem.indexOf(u8, help, "Usage:") != null);
-    try std.testing.expect(std.mem.indexOf(u8, help, "Commands:") != null);
     try std.testing.expect(std.mem.indexOf(u8, help, "Options:") != null);
+    try std.testing.expect(std.mem.indexOf(u8, help, "Commands:") == null);
+    try std.testing.expect(std.mem.indexOf(u8, help, " generate") == null);
     try std.testing.expect(std.mem.indexOf(u8, help, "--help") != null);
     try std.testing.expect(std.mem.indexOf(u8, help, "--verbose") != null);
 }

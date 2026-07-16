@@ -41,7 +41,7 @@ jobs:
       - name: 🛠️ Build coverage tests
         run: yarn coverage:build
 
-      - name: ✅ Generate coverage
+      - name: 🧪 Generate coverage
         run: |
           docker run --rm \
             --cap-add=SYS_PTRACE \
