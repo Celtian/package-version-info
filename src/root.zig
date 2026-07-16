@@ -1,30 +1,23 @@
-//! By convention, root.zig is the root source file when making a library.
+//! Generates TypeScript version information from package metadata and Git.
 const std = @import("std");
 
 const embedded_package_json = @embedFile("package.json");
 
-const Color = struct {
-    pub const RESET = "\x1b[0m";
-    pub const BOLD = "\x1b[1m";
-    pub const RED = "\x1b[31m";
-    pub const GREEN = "\x1b[32m";
-    pub const YELLOW = "\x1b[33m";
-    pub const BLUE = "\x1b[34m";
-    pub const MAGENTA = "\x1b[35m";
-    pub const CYAN = "\x1b[36m";
-    pub const WHITE = "\x1b[37m";
-    pub const BRIGHT_GREEN = "\x1b[92m";
-    pub const BRIGHT_BLUE = "\x1b[94m";
-    pub const BRIGHT_MAGENTA = "\x1b[95m";
-    pub const BRIGHT_CYAN = "\x1b[96m";
+const color = struct {
+    const reset = "\x1b[0m";
+    const yellow = "\x1b[33m";
+    const blue = "\x1b[34m";
+    const cyan = "\x1b[36m";
+    const bright_green = "\x1b[92m";
+    const bright_blue = "\x1b[94m";
+    const bright_magenta = "\x1b[95m";
+    const bright_cyan = "\x1b[96m";
 };
 
-/// Helper function for colored logging
-fn log(comptime color: []const u8, comptime emoji: []const u8, comptime fmt: []const u8, args: anytype) void {
-    std.debug.print("{s}" ++ emoji ++ " " ++ fmt ++ "{s}\n", .{color} ++ args ++ .{Color.RESET});
+fn log(comptime color_code: []const u8, comptime emoji: []const u8, comptime fmt: []const u8, args: anytype) void {
+    std.debug.print("{s}" ++ emoji ++ " " ++ fmt ++ "{s}\n", .{color_code} ++ args ++ .{color.reset});
 }
 
-/// Helper function for printing empty line
 fn logNewLine() void {
     std.debug.print("\n", .{});
 }
@@ -38,8 +31,8 @@ pub fn printToolVersion(allocator: std.mem.Allocator) !void {
     const name = parsed.value.object.get("name").?.string;
 
     logNewLine();
-    log(Color.BRIGHT_CYAN, "📦", "{s}", .{name});
-    log(Color.BRIGHT_CYAN, "📌", "Version: {s}", .{version});
+    log(color.bright_cyan, "📦", "{s}", .{name});
+    log(color.bright_cyan, "📌", "Version: {s}", .{version});
     logNewLine();
 }
 
@@ -54,171 +47,147 @@ pub const AuthorInfo = struct {
 pub const GitInfo = struct {
     branch: []const u8,
     commit: []const u8,
+
+    pub fn deinit(info: GitInfo, allocator: std.mem.Allocator) void {
+        allocator.free(info.branch);
+        allocator.free(info.commit);
+    }
 };
+
+fn readFileAlloc(allocator: std.mem.Allocator, io: std.Io, path: []const u8, limit: std.Io.Limit) ![]u8 {
+    const file = try std.Io.Dir.cwd().openFile(io, path, .{});
+    defer file.close(io);
+
+    var reader = file.reader(io, &.{});
+    return reader.interface.allocRemaining(allocator, limit);
+}
+
+fn readGitFileAlloc(allocator: std.mem.Allocator, io: std.Io, git_path: []const u8, file_path: []const u8, limit: std.Io.Limit) !?[]u8 {
+    const path = try std.fs.path.join(allocator, &.{ git_path, file_path });
+    defer allocator.free(path);
+
+    return readFileAlloc(allocator, io, path, limit) catch |err| switch (err) {
+        error.FileNotFound => null,
+        else => return err,
+    };
+}
+
+fn findPackedCommit(content: []const u8, ref_name: []const u8) ?[]const u8 {
+    var lines = std.mem.splitScalar(u8, content, '\n');
+    while (lines.next()) |line| {
+        if (line.len == 0 or line[0] == '#' or line[0] == '^') continue;
+
+        var parts = std.mem.splitScalar(u8, line, ' ');
+        const commit = parts.next() orelse continue;
+        const ref = parts.next() orelse continue;
+        if (std.mem.eql(u8, std.mem.trim(u8, ref, "\r"), ref_name)) return commit;
+    }
+    return null;
+}
+
+fn readOwnedCommit(allocator: std.mem.Allocator, io: std.Io, git_path: []const u8, ref_name: []const u8) !?[]const u8 {
+    if (try readGitFileAlloc(allocator, io, git_path, ref_name, .limited(1024))) |content| {
+        defer allocator.free(content);
+        return try allocator.dupe(u8, std.mem.trim(u8, content, " \n\r\t"));
+    }
+
+    const packed_refs = try readGitFileAlloc(allocator, io, git_path, "packed-refs", .limited(1024 * 1024)) orelse return null;
+    defer allocator.free(packed_refs);
+
+    const commit = findPackedCommit(packed_refs, ref_name) orelse return null;
+    return try allocator.dupe(u8, commit);
+}
+
+fn initGitInfo(allocator: std.mem.Allocator, branch: []const u8, owned_commit: []const u8) !GitInfo {
+    errdefer allocator.free(owned_commit);
+    return .{
+        .branch = try allocator.dupe(u8, branch),
+        .commit = owned_commit,
+    };
+}
 
 /// Reads the current git branch and commit hash from a Git directory.
 /// Returns null if the directory is not a Git repository.
+/// The caller owns the returned strings and must free them with `GitInfo.deinit`.
 pub fn getGitInfo(allocator: std.mem.Allocator, io: std.Io, git_path: []const u8) !?GitInfo {
-    const head_path = try std.fs.path.join(allocator, &.{ git_path, "HEAD" });
-    defer allocator.free(head_path);
-
-    const cwd = std.Io.Dir.cwd();
-    const head_file = cwd.openFile(io, head_path, .{}) catch |err| {
-        if (err == error.FileNotFound) {
-            return null; // Not a git repository
-        }
-        return err;
-    };
-    defer head_file.close(io);
-
-    var head_reader = head_file.reader(io, &.{});
-    const head_content = try head_reader.interface.allocRemaining(allocator, .limited(1024));
+    const head_content = try readGitFileAlloc(allocator, io, git_path, "HEAD", .limited(1024)) orelse return null;
     defer allocator.free(head_content);
 
-    // Parse the ref from HEAD (format: "ref: refs/heads/branch-name\n")
-    const head_trimmed = std.mem.trim(u8, head_content, " \n\r\t");
-
-    var branch: []const u8 = "unknown";
-    var ref_path_raw: []const u8 = undefined;
-
-    if (std.mem.startsWith(u8, head_trimmed, "ref: ")) {
-        ref_path_raw = head_trimmed[5..]; // Skip "ref: " prefix
-
-        // Extract branch name from refs/heads/branch-name
-        if (std.mem.startsWith(u8, ref_path_raw, "refs/heads/")) {
-            branch = ref_path_raw[11..]; // Skip "refs/heads/"
-        }
-
-        const ref_path = try std.fs.path.join(allocator, &.{ git_path, ref_path_raw });
-        defer allocator.free(ref_path);
-
-        // Try to read the commit hash from the ref file
-        var commit_owned: []const u8 = undefined;
-
-        if (cwd.openFile(io, ref_path, .{})) |ref_file| {
-            defer ref_file.close(io);
-            var ref_reader = ref_file.reader(io, &.{});
-            const commit_content = try ref_reader.interface.allocRemaining(allocator, .limited(1024));
-            defer allocator.free(commit_content);
-            const commit = std.mem.trim(u8, commit_content, " \n\r\t");
-            commit_owned = try allocator.dupe(u8, commit);
-        } else |err| {
-            if (err == error.FileNotFound) {
-                // Ref file not found, try packed-refs
-                const packed_refs_path = try std.fs.path.join(allocator, &.{ git_path, "packed-refs" });
-                defer allocator.free(packed_refs_path);
-                const packed_refs_file = cwd.openFile(io, packed_refs_path, .{}) catch |packed_err| {
-                    if (packed_err == error.FileNotFound) {
-                        return null; // Neither individual ref nor packed-refs found
-                    }
-                    return packed_err;
-                };
-                defer packed_refs_file.close(io);
-
-                var packed_reader = packed_refs_file.reader(io, &.{});
-                const packed_content = try packed_reader.interface.allocRemaining(allocator, .limited(1024 * 1024));
-                defer allocator.free(packed_content);
-
-                // Search for the ref in packed-refs format: "<commit> <ref>\n"
-                var lines = std.mem.splitScalar(u8, packed_content, '\n');
-                while (lines.next()) |line| {
-                    if (line.len == 0 or line[0] == '#' or line[0] == '^') continue;
-
-                    var parts = std.mem.splitScalar(u8, line, ' ');
-                    const commit_hash = parts.next() orelse continue;
-                    const ref_name = parts.next() orelse continue;
-
-                    if (std.mem.eql(u8, ref_name, ref_path_raw)) {
-                        const commit = std.mem.trim(u8, commit_hash, " \n\r\t");
-                        commit_owned = try allocator.dupe(u8, commit);
-                        break;
-                    }
-                } else {
-                    return null; // Ref not found in packed-refs
-                }
-            } else {
-                return err;
-            }
-        }
-
-        return GitInfo{
-            .branch = try allocator.dupe(u8, branch),
-            .commit = commit_owned,
-        };
-    } else {
-        // Detached HEAD state - HEAD contains the commit hash directly
-        return GitInfo{
-            .branch = try allocator.dupe(u8, "HEAD"),
-            .commit = try allocator.dupe(u8, head_trimmed),
-        };
+    const head = std.mem.trim(u8, head_content, " \n\r\t");
+    if (!std.mem.startsWith(u8, head, "ref: ")) {
+        return try initGitInfo(allocator, "HEAD", try allocator.dupe(u8, head));
     }
+
+    const ref_name = head["ref: ".len..];
+    const commit = try readOwnedCommit(allocator, io, git_path, ref_name) orelse return null;
+    const branch = if (std.mem.startsWith(u8, ref_name, "refs/heads/"))
+        ref_name["refs/heads/".len..]
+    else
+        "unknown";
+
+    return try initGitInfo(allocator, branch, commit);
 }
 
-fn writeTypescriptHeader(writer: anytype) !void {
-    try writer.writeAll("/**\n");
-    try writer.writeAll(" * Generated by script 🍺\n");
-    try writer.writeAll(" * Do not edit manually.\n");
-    try writer.writeAll(" */\n\n");
+fn getAuthor(package: std.json.Value) ?AuthorInfo {
+    const author = package.object.get("author") orelse return null;
+    if (author != .object) return null;
+
+    const name = author.object.get("name") orelse return null;
+    return .{
+        .name = name.string,
+        .email = if (author.object.get("email")) |email| email.string else "",
+        .url = if (author.object.get("url")) |url| url.string else "",
+    };
 }
 
-/// Writes the VERSION_INFO export statement to the output
 fn writeVersionInfo(writer: anytype, version: []const u8, date_str: []const u8, author_info: ?AuthorInfo, git_info: ?GitInfo) !void {
-    try writer.print("export const VERSION_INFO = {{\n", .{});
+    try writer.writeAll(
+        \\/**
+        \\ * Generated by script 🍺
+        \\ * Do not edit manually.
+        \\ */
+        \\
+        \\export const VERSION_INFO = {
+        \\
+    );
     try writer.print("  version: \"{s}\",\n", .{version});
     try writer.print("  date: \"{s}\"", .{date_str});
 
     if (author_info) |author| {
-        try writer.print(",\n", .{});
-        try writer.print("  author: {{\n", .{});
+        try writer.writeAll(",\n  author: {\n");
         try writer.print("    name: \"{s}\",\n", .{author.name});
         try writer.print("    email: \"{s}\",\n", .{author.email});
         try writer.print("    url: \"{s}\"\n", .{author.url});
-        try writer.print("  }}", .{});
+        try writer.writeAll("  }");
     }
 
     if (git_info) |info| {
-        try writer.print(",\n", .{});
-        try writer.print("  git: {{\n", .{});
+        try writer.writeAll(",\n  git: {\n");
         try writer.print("    branch: \"{s}\",\n", .{info.branch});
         try writer.print("    commit: \"{s}\"\n", .{info.commit});
-        try writer.print("  }}", .{});
+        try writer.writeAll("  }");
     }
 
-    try writer.print("\n}};\n", .{});
+    try writer.writeAll("\n};\n");
 }
 
 /// Formats a Unix timestamp in milliseconds to ISO 8601 format (YYYY-MM-DDTHH:MM:SS.sssZ)
 fn formatTimestampISO8601(buffer: []u8, millis: i64) ![]const u8 {
-    const seconds = @divTrunc(millis, 1000);
-    const ms = @mod(millis, 1000);
+    const epoch: std.time.epoch.EpochSeconds = .{
+        .secs = @intCast(@divTrunc(millis, std.time.ms_per_s)),
+    };
+    const year_day = epoch.getEpochDay().calculateYearDay();
+    const month_day = year_day.calculateMonthDay();
+    const day_seconds = epoch.getDaySeconds();
 
-    // Calculate date components from Unix timestamp
-    const seconds_per_day: i64 = 86400;
-    const days_since_epoch = @divTrunc(seconds, seconds_per_day);
-    const seconds_today = @mod(seconds, seconds_per_day);
-
-    // Unix epoch is 1970-01-01, which is day 719468 in the proleptic Gregorian calendar
-    const days_from_0 = days_since_epoch + 719468;
-
-    // Calculate year, month, day using algorithm
-    const era = @divTrunc(days_from_0, 146097);
-    const doe = @mod(days_from_0, 146097);
-    const yoe = @divTrunc(doe - @divTrunc(doe, 1460) + @divTrunc(doe, 36524) - @divTrunc(doe, 146096), 365);
-    const y = yoe + era * 400;
-    const doy = doe - (365 * yoe + @divTrunc(yoe, 4) - @divTrunc(yoe, 100));
-    const mp = @divTrunc(5 * doy + 2, 153);
-    const d = doy - @divTrunc(153 * mp + 2, 5) + 1;
-    const m = if (mp < 10) mp + 3 else mp - 9;
-    const year = if (m <= 2) y + 1 else y;
-
-    const hours = @divTrunc(seconds_today, 3600);
-    const minutes = @divTrunc(@mod(seconds_today, 3600), 60);
-    const secs = @mod(seconds_today, 60);
-
-    return try std.fmt.bufPrint(buffer, "{d:0>4}-{d:0>2}-{d:0>2}T{d:0>2}:{d:0>2}:{d:0>2}.{d:0>3}Z", .{
-        @as(u32, @intCast(year)),  @as(u32, @intCast(m)),       @as(u32, @intCast(d)),
-        @as(u32, @intCast(hours)), @as(u32, @intCast(minutes)), @as(u32, @intCast(secs)),
-        @as(u32, @intCast(ms)),
+    return std.fmt.bufPrint(buffer, "{d:0>4}-{d:0>2}-{d:0>2}T{d:0>2}:{d:0>2}:{d:0>2}.{d:0>3}Z", .{
+        year_day.year,
+        month_day.month.numeric(),
+        month_day.day_index + 1,
+        day_seconds.getHoursIntoDay(),
+        day_seconds.getMinutesIntoHour(),
+        day_seconds.getSecondsIntoMinute(),
+        @as(u16, @intCast(@mod(millis, std.time.ms_per_s))),
     });
 }
 
@@ -226,77 +195,53 @@ fn formatTimestampISO8601(buffer: []u8, millis: i64) ![]const u8 {
 pub fn generateVersionInfo(allocator: std.mem.Allocator, io: std.Io, package_json_path: []const u8, output_path: []const u8, git_path: []const u8) !void {
     const start_time = std.Io.Clock.awake.now(io);
     logNewLine();
-    log(Color.YELLOW, "🚀", "Starting version info generation...", .{});
+    log(color.yellow, "🚀", "Starting version info generation...", .{});
 
     logNewLine();
-    log(Color.BLUE, "📖", "Reading {s}...", .{package_json_path});
+    log(color.blue, "📖", "Reading {s}...", .{package_json_path});
     const cwd = std.Io.Dir.cwd();
-    const file = try cwd.openFile(io, package_json_path, .{});
-    defer file.close(io);
-
-    var file_reader = file.reader(io, &.{});
-    const file_content = try file_reader.interface.allocRemaining(allocator, .limited(1024 * 1024));
+    const file_content = try readFileAlloc(allocator, io, package_json_path, .limited(1024 * 1024));
     defer allocator.free(file_content);
 
     const parsed = try std.json.parseFromSlice(std.json.Value, allocator, file_content, .{});
     defer parsed.deinit();
 
     const version = parsed.value.object.get("version").?.string;
-    log(Color.BLUE, "📦", "Version: {s}", .{version});
+    log(color.blue, "📦", "Version: {s}", .{version});
 
     logNewLine();
-    log(Color.BRIGHT_BLUE, "👤", "Reading author info...", .{});
-    var author_info: ?AuthorInfo = null;
-    if (parsed.value.object.get("author")) |author_value| {
-        if (author_value == .object) {
-            const author_obj = author_value.object;
-            if (author_obj.get("name")) |name| {
-                const author_name = name.string;
-                const author_email = if (author_obj.get("email")) |email| email.string else "";
-                const author_url = if (author_obj.get("url")) |url| url.string else "";
-
-                author_info = AuthorInfo{
-                    .name = author_name,
-                    .email = author_email,
-                    .url = author_url,
-                };
-
-                log(Color.BRIGHT_BLUE, "✍️ ", "Name: {s}", .{author_name});
-                if (author_email.len > 0) {
-                    log(Color.BRIGHT_BLUE, "📧", "Email: {s}", .{author_email});
-                }
-                if (author_url.len > 0) {
-                    log(Color.BRIGHT_BLUE, "🔗", "URL: {s}", .{author_url});
-                }
-            }
-        }
-    }
-    if (author_info == null) {
-        log(Color.YELLOW, "⚠️ ", "No author info found in package.json", .{});
+    log(color.bright_blue, "👤", "Reading author info...", .{});
+    const author_info = getAuthor(parsed.value);
+    if (author_info) |author| {
+        log(color.bright_blue, "✍️ ", "Name: {s}", .{author.name});
+        if (author.email.len > 0) log(color.bright_blue, "📧", "Email: {s}", .{author.email});
+        if (author.url.len > 0) log(color.bright_blue, "🔗", "URL: {s}", .{author.url});
+    } else {
+        log(color.yellow, "⚠️ ", "No author info found in package.json", .{});
     }
 
     logNewLine();
-    log(Color.CYAN, "⏰", "Generating timestamp...", .{});
+    log(color.cyan, "⏰", "Generating timestamp...", .{});
     const millis = std.Io.Clock.real.now(io).toMilliseconds();
     var date_buffer: [30]u8 = undefined;
     const date_str = try formatTimestampISO8601(&date_buffer, millis);
-    log(Color.CYAN, "📅", "Date: {s}", .{date_str});
+    log(color.cyan, "📅", "Date: {s}", .{date_str});
 
     logNewLine();
-    log(Color.BRIGHT_MAGENTA, "🌿", "Reading git info...", .{});
+    log(color.bright_magenta, "🌿", "Reading git info...", .{});
     const git_info = try getGitInfo(allocator, io, git_path);
+    defer if (git_info) |info| info.deinit(allocator);
 
     if (git_info) |info| {
-        log(Color.BRIGHT_MAGENTA, "📍", "Branch: {s}", .{info.branch});
-        log(Color.BRIGHT_MAGENTA, "🔖", "Commit: {s}", .{info.commit});
+        log(color.bright_magenta, "📍", "Branch: {s}", .{info.branch});
+        log(color.bright_magenta, "🔖", "Commit: {s}", .{info.commit});
     } else {
-        log(Color.YELLOW, "⚠️ ", "Not a git repository (git info skipped)", .{});
+        log(color.yellow, "⚠️ ", "Not a git repository (git info skipped)", .{});
     }
 
     logNewLine();
-    log(Color.BRIGHT_GREEN, "✍️ ", "Writing to {s}...", .{output_path});
+    log(color.bright_green, "✍️ ", "Writing to {s}...", .{output_path});
 
-    // Ensure parent directory exists
     if (std.fs.path.dirname(output_path)) |dir_path| {
         try cwd.createDirPath(io, dir_path);
     }
@@ -308,21 +253,80 @@ pub fn generateVersionInfo(allocator: std.mem.Allocator, io: std.Io, package_jso
     var stdout_writer = output_file.writer(io, &stdout_buffer);
     const writer = &stdout_writer.interface;
 
-    try writeTypescriptHeader(writer);
     try writeVersionInfo(writer, version, date_str, author_info, git_info);
 
     try writer.flush();
 
-    // Free git_info memory after writing
-    if (git_info) |info| {
-        allocator.free(info.branch);
-        allocator.free(info.commit);
-    }
-
     const end_time = std.Io.Clock.awake.now(io);
     const duration_ms = start_time.durationTo(end_time).toMilliseconds();
-    log(Color.BRIGHT_GREEN, "✅", "Successfully generated {s}", .{output_path});
+    log(color.bright_green, "✅", "Successfully generated {s}", .{output_path});
     logNewLine();
-    log(Color.YELLOW, "⏱️ ", "Duration: {d}ms", .{duration_ms});
+    log(color.yellow, "⏱️ ", "Duration: {d}ms", .{duration_ms});
     logNewLine();
+}
+
+test "formats Unix epoch as ISO 8601" {
+    var buffer: [30]u8 = undefined;
+    try std.testing.expectEqualStrings(
+        "1970-01-01T00:00:00.000Z",
+        try formatTimestampISO8601(&buffer, 0),
+    );
+}
+
+test "formats leap day as ISO 8601" {
+    var buffer: [30]u8 = undefined;
+    try std.testing.expectEqualStrings(
+        "2024-02-29T12:34:56.789Z",
+        try formatTimestampISO8601(&buffer, 1_709_210_096_789),
+    );
+}
+
+test "finds commit in packed refs" {
+    const packed_refs =
+        \\# pack-refs with: peeled fully-peeled sorted
+        \\1111111111111111111111111111111111111111 refs/heads/main
+        \\^2222222222222222222222222222222222222222
+        \\3333333333333333333333333333333333333333 refs/heads/release
+    ;
+
+    try std.testing.expectEqualStrings(
+        "3333333333333333333333333333333333333333",
+        findPackedCommit(packed_refs, "refs/heads/release").?,
+    );
+    try std.testing.expectEqual(null, findPackedCommit(packed_refs, "refs/heads/missing"));
+}
+
+test "writes complete TypeScript file" {
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    try writeVersionInfo(
+        &output.writer,
+        "1.2.3",
+        "2026-07-16T12:34:56.789Z",
+        .{ .name = "Name", .email = "mail@example.com", .url = "https://example.com" },
+        .{ .branch = "main", .commit = "abc123" },
+    );
+
+    try std.testing.expectEqualStrings(
+        \\/**
+        \\ * Generated by script 🍺
+        \\ * Do not edit manually.
+        \\ */
+        \\
+        \\export const VERSION_INFO = {
+        \\  version: "1.2.3",
+        \\  date: "2026-07-16T12:34:56.789Z",
+        \\  author: {
+        \\    name: "Name",
+        \\    email: "mail@example.com",
+        \\    url: "https://example.com"
+        \\  },
+        \\  git: {
+        \\    branch: "main",
+        \\    commit: "abc123"
+        \\  }
+        \\};
+        \\
+    , output.writer.buffered());
 }
