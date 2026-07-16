@@ -51,7 +51,7 @@ npx package-version-info --output src/version-info.ts
 ```
 
 ```text
-✅ Generated src/version-info.ts (v1.0.0, 2ms)
+✅ Generated src/version-info.ts (v1.0.0, 2.00ms)
 ```
 
 ### 3. Import it
@@ -135,7 +135,7 @@ npx package-version-info \
 Compact mode is designed for normal builds:
 
 ```text
-✅ Generated src/version-info.ts (v1.0.0, 2ms)
+✅ Generated src/version-info.ts (v1.0.0, 2.00ms)
 ```
 
 Use verbose mode when diagnosing package, author, timestamp, Git, or output-path behavior:
