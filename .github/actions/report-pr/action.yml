@@ -18,7 +18,7 @@ runs:
         badge: true
         fail_below_min: false
         format: markdown
-        hide_branch_rate: false
+        hide_branch_rate: true
         hide_complexity: true
         indicators: true
         output: both

@@ -24,3 +24,7 @@ kcov \
   "$coverage_dir/merged" \
   "$coverage_dir/root" \
   "$coverage_dir/cli"
+
+sed -i \
+  's/ branch-rate="[^"]*" branches-covered="[^"]*" branches-rate="[^"]*"/ branch-rate="0" branches-covered="0" branches-valid="0"/' \
+  "$coverage_dir/merged/kcov-merged/cobertura.xml"
