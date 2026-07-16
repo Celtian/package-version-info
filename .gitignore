@@ -31,6 +31,7 @@ Thumbs.db
 
 # Temp files
 version-info.ts
+coverage
 dist
 tmp
 src/package.json

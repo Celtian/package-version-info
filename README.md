@@ -47,7 +47,7 @@ yarn add package-version-info --dev
 ### 2. Generate the file
 
 ```bash
-npx package-version-info generate --output src/version-info.ts
+npx package-version-info --output src/version-info.ts
 ```
 
 ```text
@@ -91,17 +91,11 @@ The `author` property is omitted when `package.json` has no object-style author 
 
 ## 🧭 CLI reference
 
-Running the CLI without arguments displays help:
+Running the CLI without arguments generates `version-info.ts` from `package.json`:
 
 ```bash
 npx package-version-info
 ```
-
-### Commands
-
-| Command | Description |
-| --- | --- |
-| `generate` | Generate the TypeScript version information file. |
 
 ### Options
 
@@ -118,28 +112,22 @@ npx package-version-info
 
 ```bash
 # Generate with default paths
-npx package-version-info generate
+npx package-version-info
 
 # Show detailed progress
-npx package-version-info generate --verbose
+npx package-version-info --verbose
 
 # Use custom paths
-npx package-version-info generate \
+npx package-version-info \
   --input package.json \
   --output src/generated/version-info.ts \
   --git .git
 
 # Short aliases
-npx package-version-info generate \
+npx package-version-info \
   -i package.json \
   -o src/generated/version-info.ts \
   -g .git
-```
-
-Flag-only generation remains supported for existing scripts:
-
-```bash
-npx package-version-info --output src/version-info.ts
 ```
 
 ## 🎨 Compact and verbose logging
@@ -153,7 +141,7 @@ Compact mode is designed for normal builds:
 Use verbose mode when diagnosing package, author, timestamp, Git, or output-path behavior:
 
 ```bash
-npx package-version-info generate --verbose
+npx package-version-info --verbose
 ```
 
 ## 🛠️ Build-tool integration
@@ -163,7 +151,7 @@ Generate version information automatically before your application build:
 ```json
 {
   "scripts": {
-    "version-info": "package-version-info generate --output src/version-info.ts",
+    "version-info": "package-version-info --output src/version-info.ts",
     "prebuild": "npm run version-info",
     "build": "tsc"
   }
@@ -186,7 +174,7 @@ Requirements:
 zig build
 
 # Run the CLI
-zig build run -- generate
+zig build run
 
 # Run all formatting, build, and test checks
 yarn validate

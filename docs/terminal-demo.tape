@@ -34,7 +34,7 @@ Sleep 3s
 Ctrl+L
 Sleep 500ms
 
-Type "package-version-info generate --output generated/version-info.ts"
+Type "package-version-info --output generated/version-info.ts"
 Enter
 Sleep 2s
 

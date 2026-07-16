@@ -43,4 +43,25 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run tests");
     test_step.dependOn(&b.addRunArtifact(mod_tests).step);
     test_step.dependOn(&b.addRunArtifact(cli_tests).step);
+
+    const mod_coverage_tests = b.addTest(.{
+        .name = "root-coverage",
+        .root_module = mod,
+        .use_llvm = true,
+    });
+    const cli_coverage_tests = b.addTest(.{
+        .name = "cli-coverage",
+        .root_module = cli_mod,
+        .use_llvm = true,
+    });
+    const install_mod_coverage_tests = b.addInstallArtifact(mod_coverage_tests, .{
+        .dest_dir = .{ .override = .{ .custom = "coverage-tests" } },
+    });
+    const install_cli_coverage_tests = b.addInstallArtifact(cli_coverage_tests, .{
+        .dest_dir = .{ .override = .{ .custom = "coverage-tests" } },
+    });
+
+    const coverage_step = b.step("coverage", "Build test executables for code coverage");
+    coverage_step.dependOn(&install_mod_coverage_tests.step);
+    coverage_step.dependOn(&install_cli_coverage_tests.step);
 }
