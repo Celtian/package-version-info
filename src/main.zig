@@ -1,14 +1,12 @@
 const std = @import("std");
 const version_info = @import("version_info");
 
-pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+pub fn main(init: std.process.Init) !void {
+    const allocator = init.gpa;
+    const io = init.io;
 
     // Parse command line arguments
-    var args = try std.process.argsWithAllocator(allocator);
-    defer args.deinit();
+    var args = init.minimal.args.iterate();
 
     // Skip the program name
     _ = args.next();
@@ -37,5 +35,5 @@ pub fn main() !void {
         }
     }
 
-    try version_info.generateVersionInfo(allocator, input_path, output_path, git_path);
+    try version_info.generateVersionInfo(allocator, io, input_path, output_path, git_path);
 }

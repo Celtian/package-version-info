@@ -133,7 +133,7 @@ This project is written in Zig. To build from source:
 
 ### Prerequisites
 
-- [Zig](https://ziglang.org/) >= 0.15.2
+- [Zig](https://ziglang.org/) >= 0.16.0
 
 ### Build Commands
 

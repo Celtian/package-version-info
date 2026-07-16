@@ -58,19 +58,21 @@ pub const GitInfo = struct {
 
 /// Reads the current git branch and commit hash from a Git directory.
 /// Returns null if the directory is not a Git repository.
-pub fn getGitInfo(allocator: std.mem.Allocator, git_path: []const u8) !?GitInfo {
+pub fn getGitInfo(allocator: std.mem.Allocator, io: std.Io, git_path: []const u8) !?GitInfo {
     const head_path = try std.fs.path.join(allocator, &.{ git_path, "HEAD" });
     defer allocator.free(head_path);
 
-    const head_file = std.fs.cwd().openFile(head_path, .{}) catch |err| {
+    const cwd = std.Io.Dir.cwd();
+    const head_file = cwd.openFile(io, head_path, .{}) catch |err| {
         if (err == error.FileNotFound) {
             return null; // Not a git repository
         }
         return err;
     };
-    defer head_file.close();
+    defer head_file.close(io);
 
-    const head_content = try head_file.readToEndAlloc(allocator, 1024);
+    var head_reader = head_file.reader(io, &.{});
+    const head_content = try head_reader.interface.allocRemaining(allocator, .limited(1024));
     defer allocator.free(head_content);
 
     // Parse the ref from HEAD (format: "ref: refs/heads/branch-name\n")
@@ -93,9 +95,10 @@ pub fn getGitInfo(allocator: std.mem.Allocator, git_path: []const u8) !?GitInfo 
         // Try to read the commit hash from the ref file
         var commit_owned: []const u8 = undefined;
 
-        if (std.fs.cwd().openFile(ref_path, .{})) |ref_file| {
-            defer ref_file.close();
-            const commit_content = try ref_file.readToEndAlloc(allocator, 1024);
+        if (cwd.openFile(io, ref_path, .{})) |ref_file| {
+            defer ref_file.close(io);
+            var ref_reader = ref_file.reader(io, &.{});
+            const commit_content = try ref_reader.interface.allocRemaining(allocator, .limited(1024));
             defer allocator.free(commit_content);
             const commit = std.mem.trim(u8, commit_content, " \n\r\t");
             commit_owned = try allocator.dupe(u8, commit);
@@ -104,15 +107,16 @@ pub fn getGitInfo(allocator: std.mem.Allocator, git_path: []const u8) !?GitInfo 
                 // Ref file not found, try packed-refs
                 const packed_refs_path = try std.fs.path.join(allocator, &.{ git_path, "packed-refs" });
                 defer allocator.free(packed_refs_path);
-                const packed_refs_file = std.fs.cwd().openFile(packed_refs_path, .{}) catch |packed_err| {
+                const packed_refs_file = cwd.openFile(io, packed_refs_path, .{}) catch |packed_err| {
                     if (packed_err == error.FileNotFound) {
                         return null; // Neither individual ref nor packed-refs found
                     }
                     return packed_err;
                 };
-                defer packed_refs_file.close();
+                defer packed_refs_file.close(io);
 
-                const packed_content = try packed_refs_file.readToEndAlloc(allocator, 1024 * 1024);
+                var packed_reader = packed_refs_file.reader(io, &.{});
+                const packed_content = try packed_reader.interface.allocRemaining(allocator, .limited(1024 * 1024));
                 defer allocator.free(packed_content);
 
                 // Search for the ref in packed-refs format: "<commit> <ref>\n"
@@ -219,17 +223,19 @@ fn formatTimestampISO8601(buffer: []u8, millis: i64) ![]const u8 {
 }
 
 /// Generates a version-info.ts file from package.json
-pub fn generateVersionInfo(allocator: std.mem.Allocator, package_json_path: []const u8, output_path: []const u8, git_path: []const u8) !void {
-    const start_time = std.time.milliTimestamp();
+pub fn generateVersionInfo(allocator: std.mem.Allocator, io: std.Io, package_json_path: []const u8, output_path: []const u8, git_path: []const u8) !void {
+    const start_time = std.Io.Clock.awake.now(io);
     logNewLine();
     log(Color.YELLOW, "🚀", "Starting version info generation...", .{});
 
     logNewLine();
     log(Color.BLUE, "📖", "Reading {s}...", .{package_json_path});
-    const file = try std.fs.cwd().openFile(package_json_path, .{});
-    defer file.close();
+    const cwd = std.Io.Dir.cwd();
+    const file = try cwd.openFile(io, package_json_path, .{});
+    defer file.close(io);
 
-    const file_content = try file.readToEndAlloc(allocator, 1024 * 1024);
+    var file_reader = file.reader(io, &.{});
+    const file_content = try file_reader.interface.allocRemaining(allocator, .limited(1024 * 1024));
     defer allocator.free(file_content);
 
     const parsed = try std.json.parseFromSlice(std.json.Value, allocator, file_content, .{});
@@ -271,14 +277,14 @@ pub fn generateVersionInfo(allocator: std.mem.Allocator, package_json_path: []co
 
     logNewLine();
     log(Color.CYAN, "⏰", "Generating timestamp...", .{});
-    const millis = std.time.milliTimestamp();
+    const millis = std.Io.Clock.real.now(io).toMilliseconds();
     var date_buffer: [30]u8 = undefined;
     const date_str = try formatTimestampISO8601(&date_buffer, millis);
     log(Color.CYAN, "📅", "Date: {s}", .{date_str});
 
     logNewLine();
     log(Color.BRIGHT_MAGENTA, "🌿", "Reading git info...", .{});
-    const git_info = try getGitInfo(allocator, git_path);
+    const git_info = try getGitInfo(allocator, io, git_path);
 
     if (git_info) |info| {
         log(Color.BRIGHT_MAGENTA, "📍", "Branch: {s}", .{info.branch});
@@ -292,14 +298,14 @@ pub fn generateVersionInfo(allocator: std.mem.Allocator, package_json_path: []co
 
     // Ensure parent directory exists
     if (std.fs.path.dirname(output_path)) |dir_path| {
-        try std.fs.cwd().makePath(dir_path);
+        try cwd.createDirPath(io, dir_path);
     }
 
-    const output_file = try std.fs.cwd().createFile(output_path, .{});
-    defer output_file.close();
+    const output_file = try cwd.createFile(io, output_path, .{});
+    defer output_file.close(io);
 
     var stdout_buffer: [1024]u8 = undefined;
-    var stdout_writer = output_file.writer(&stdout_buffer);
+    var stdout_writer = output_file.writer(io, &stdout_buffer);
     const writer = &stdout_writer.interface;
 
     try writeTypescriptHeader(writer);
@@ -313,8 +319,8 @@ pub fn generateVersionInfo(allocator: std.mem.Allocator, package_json_path: []co
         allocator.free(info.commit);
     }
 
-    const end_time = std.time.milliTimestamp();
-    const duration_ms = end_time - start_time;
+    const end_time = std.Io.Clock.awake.now(io);
+    const duration_ms = start_time.durationTo(end_time).toMilliseconds();
     log(Color.BRIGHT_GREEN, "✅", "Successfully generated {s}", .{output_path});
     logNewLine();
     log(Color.YELLOW, "⏱️ ", "Duration: {d}ms", .{duration_ms});
