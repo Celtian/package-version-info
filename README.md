@@ -110,7 +110,10 @@ npx package-version-info
 | `--verbose` | — | Disabled | Display detailed generation progress. |
 | `--input <path>` | `-i` | `package.json` | Input package file. |
 | `--output <path>` | `-o` | `version-info.ts` | Generated TypeScript file. |
-| `--git <path>` | `-g` | `.git` | Git directory used for branch and commit metadata. |
+| `--git <path>` | `-g` | `.git` | Git directory or pointer file used for branch and commit metadata. |
+
+The Git path may be a regular `.git` directory or the `.git` pointer file used by linked
+worktrees and submodules.
 
 ### Common examples
 

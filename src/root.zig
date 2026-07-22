@@ -91,6 +91,58 @@ fn readGitFileAlloc(allocator: std.mem.Allocator, io: std.Io, git_path: []const 
     };
 }
 
+const GitLayout = struct {
+    git_dir: []u8,
+    common_dir: []u8,
+
+    fn deinit(layout: GitLayout, allocator: std.mem.Allocator) void {
+        allocator.free(layout.git_dir);
+        allocator.free(layout.common_dir);
+    }
+};
+
+fn resolveRelativePath(allocator: std.mem.Allocator, base_dir: []const u8, path: []const u8) ![]u8 {
+    if (std.fs.path.isAbsolute(path)) return allocator.dupe(u8, path);
+    return std.fs.path.join(allocator, &.{ base_dir, path });
+}
+
+fn resolveGitLayout(allocator: std.mem.Allocator, io: std.Io, git_path: []const u8) !?GitLayout {
+    const cwd = std.Io.Dir.cwd();
+    const stat = cwd.statFile(io, git_path, .{}) catch |err| switch (err) {
+        error.FileNotFound => return null,
+        else => return err,
+    };
+
+    const git_dir = switch (stat.kind) {
+        .directory => try allocator.dupe(u8, git_path),
+        .file => blk: {
+            const git_file = try readFileAlloc(allocator, io, git_path, .limited(4096));
+            defer allocator.free(git_file);
+
+            const content = std.mem.trim(u8, git_file, " \n\r\t");
+            const prefix = "gitdir:";
+            if (!std.mem.startsWith(u8, content, prefix)) return null;
+
+            const target = std.mem.trim(u8, content[prefix.len..], " \n\r\t");
+            if (target.len == 0) return null;
+
+            const parent_dir = std.fs.path.dirname(git_path) orelse ".";
+            break :blk try resolveRelativePath(allocator, parent_dir, target);
+        },
+        else => return null,
+    };
+    errdefer allocator.free(git_dir);
+
+    const common_dir = if (try readGitFileAlloc(allocator, io, git_dir, "commondir", .limited(4096))) |content| blk: {
+        defer allocator.free(content);
+        const target = std.mem.trim(u8, content, " \n\r\t");
+        if (target.len == 0) break :blk try allocator.dupe(u8, git_dir);
+        break :blk try resolveRelativePath(allocator, git_dir, target);
+    } else try allocator.dupe(u8, git_dir);
+
+    return .{ .git_dir = git_dir, .common_dir = common_dir };
+}
+
 fn findPackedCommit(content: []const u8, ref_name: []const u8) ?[]const u8 {
     var lines = std.mem.splitScalar(u8, content, '\n');
     while (lines.next()) |line| {
@@ -104,17 +156,27 @@ fn findPackedCommit(content: []const u8, ref_name: []const u8) ?[]const u8 {
     return null;
 }
 
-fn readOwnedCommit(allocator: std.mem.Allocator, io: std.Io, git_path: []const u8, ref_name: []const u8) !?[]const u8 {
-    if (try readGitFileAlloc(allocator, io, git_path, ref_name, .limited(1024))) |content| {
-        defer allocator.free(content);
-        return try allocator.dupe(u8, std.mem.trim(u8, content, " \n\r\t"));
+fn readOwnedCommit(allocator: std.mem.Allocator, io: std.Io, layout: GitLayout, ref_name: []const u8) !?[]const u8 {
+    const dirs = [_][]const u8{ layout.git_dir, layout.common_dir };
+
+    for (dirs, 0..) |dir, index| {
+        if (index > 0 and std.mem.eql(u8, dir, dirs[0])) continue;
+        if (try readGitFileAlloc(allocator, io, dir, ref_name, .limited(1024))) |content| {
+            defer allocator.free(content);
+            return try allocator.dupe(u8, std.mem.trim(u8, content, " \n\r\t"));
+        }
     }
 
-    const packed_refs = try readGitFileAlloc(allocator, io, git_path, "packed-refs", .limited(1024 * 1024)) orelse return null;
-    defer allocator.free(packed_refs);
+    for (dirs, 0..) |dir, index| {
+        if (index > 0 and std.mem.eql(u8, dir, dirs[0])) continue;
+        const packed_refs = try readGitFileAlloc(allocator, io, dir, "packed-refs", .limited(1024 * 1024)) orelse continue;
+        defer allocator.free(packed_refs);
 
-    const commit = findPackedCommit(packed_refs, ref_name) orelse return null;
-    return try allocator.dupe(u8, commit);
+        const commit = findPackedCommit(packed_refs, ref_name) orelse continue;
+        return try allocator.dupe(u8, commit);
+    }
+
+    return null;
 }
 
 fn initGitInfo(allocator: std.mem.Allocator, branch: []const u8, owned_commit: []const u8) !GitInfo {
@@ -125,11 +187,14 @@ fn initGitInfo(allocator: std.mem.Allocator, branch: []const u8, owned_commit: [
     };
 }
 
-/// Reads the current git branch and commit hash from a Git directory.
-/// Returns null if the directory is not a Git repository.
+/// Reads the current git branch and commit hash from a Git directory or `.git` pointer file.
+/// Returns null if the path does not identify a Git repository.
 /// The caller owns the returned strings and must free them with `GitInfo.deinit`.
 pub fn getGitInfo(allocator: std.mem.Allocator, io: std.Io, git_path: []const u8) !?GitInfo {
-    const head_content = try readGitFileAlloc(allocator, io, git_path, "HEAD", .limited(1024)) orelse return null;
+    const layout = try resolveGitLayout(allocator, io, git_path) orelse return null;
+    defer layout.deinit(allocator);
+
+    const head_content = try readGitFileAlloc(allocator, io, layout.git_dir, "HEAD", .limited(1024)) orelse return null;
     defer allocator.free(head_content);
 
     const head = std.mem.trim(u8, head_content, " \n\r\t");
@@ -138,7 +203,7 @@ pub fn getGitInfo(allocator: std.mem.Allocator, io: std.Io, git_path: []const u8
     }
 
     const ref_name = head["ref: ".len..];
-    const commit = try readOwnedCommit(allocator, io, git_path, ref_name) orelse return null;
+    const commit = try readOwnedCommit(allocator, io, layout, ref_name) orelse return null;
     const branch = if (std.mem.startsWith(u8, ref_name, "refs/heads/"))
         ref_name["refs/heads/".len..]
     else
@@ -341,6 +406,47 @@ test "finds commit in packed refs" {
         findPackedCommit(packed_refs, "refs/heads/release").?,
     );
     try std.testing.expectEqual(null, findPackedCommit(packed_refs, "refs/heads/missing"));
+}
+
+test "reads git info from a linked worktree" {
+    const allocator = std.testing.allocator;
+    const io = std.testing.io;
+    const commit = "0123456789abcdef0123456789abcdef01234567";
+
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+
+    try tmp.dir.createDirPath(io, "common/worktrees/feature");
+    try tmp.dir.createDirPath(io, "common/refs/heads");
+    try tmp.dir.writeFile(io, .{
+        .sub_path = "common/worktrees/feature/HEAD",
+        .data = "ref: refs/heads/feature\n",
+    });
+    try tmp.dir.writeFile(io, .{
+        .sub_path = "common/worktrees/feature/commondir",
+        .data = "../..\n",
+    });
+    try tmp.dir.writeFile(io, .{
+        .sub_path = "common/refs/heads/feature",
+        .data = commit ++ "\n",
+    });
+
+    var root_buffer: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const root_len = try tmp.dir.realPath(io, &root_buffer);
+    const root_path = root_buffer[0..root_len];
+    const worktree_git_dir = try std.fs.path.join(allocator, &.{ root_path, "common", "worktrees", "feature" });
+    defer allocator.free(worktree_git_dir);
+    const git_file_content = try std.fmt.allocPrint(allocator, "gitdir: {s}\n", .{worktree_git_dir});
+    defer allocator.free(git_file_content);
+    try tmp.dir.writeFile(io, .{ .sub_path = ".git", .data = git_file_content });
+
+    const git_file_path = try std.fs.path.join(allocator, &.{ root_path, ".git" });
+    defer allocator.free(git_file_path);
+    const git_info = (try getGitInfo(allocator, io, git_file_path)).?;
+    defer git_info.deinit(allocator);
+
+    try std.testing.expectEqualStrings("feature", git_info.branch);
+    try std.testing.expectEqualStrings(commit, git_info.commit);
 }
 
 test "writes compact generation summary" {
