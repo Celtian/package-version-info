@@ -44,6 +44,10 @@ npm install package-version-info --save-dev
 yarn add package-version-info --dev
 ```
 
+The npm package includes native executables for macOS arm64/x64, Linux arm64/x64, and Windows
+x64. A small Node.js launcher selects the matching executable at runtime; no platform-specific
+packages are installed separately.
+
 ### 2. Generate the file
 
 ```bash
