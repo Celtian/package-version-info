@@ -16,13 +16,13 @@ runs:
       with:
         filename: ${{ inputs.coverage-file }}
         badge: true
-        fail_below_min: false
+        fail_below_min: true
         format: markdown
         hide_branch_rate: true
         hide_complexity: true
         indicators: true
         output: both
-        thresholds: '60 80'
+        thresholds: '95 100'
 
     - name: Add Coverage PR Comment
       uses: marocchino/sticky-pull-request-comment@v2

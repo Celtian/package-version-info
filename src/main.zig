@@ -19,14 +19,17 @@ pub fn main(init: std.process.Init) !void {
             std.process.exit(2);
         },
         .generate => |options| {
-            if (options.verbose) {
+            if (options.verbose or options.dry_run) {
                 try version_info.generateVersionInfoWithOptions(
                     init.gpa,
                     init.io,
                     options.input_path,
                     options.output_path,
                     options.git_path,
-                    .{ .verbose = true },
+                    .{
+                        .verbose = options.verbose,
+                        .dry_run = options.dry_run,
+                    },
                 );
             } else {
                 try version_info.generateVersionInfo(

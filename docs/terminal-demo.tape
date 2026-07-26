@@ -1,8 +1,8 @@
 Output docs/assets/terminal-demo.gif
 
 Set Shell bash
-Set Width 1200
-Set Height 720
+Set Width 1280
+Set Height 640
 Set FontSize 20
 Set TypingSpeed 25ms
 Set Framerate 24
@@ -41,10 +41,22 @@ Sleep 2s
 Ctrl+L
 Sleep 500ms
 
-Type "sed -n '1,22p' generated/version-info.ts"
+Type "package-version-info --verbose --output generated/version-info.ts"
+Enter
+Sleep 3s
+
+Hide
+Type "rm -f generated/version-info.ts"
+Enter
+Show
+
+Ctrl+L
+Sleep 500ms
+
+Type "package-version-info --dry-run"
 Enter
 Sleep 4s
 
 Hide
-Type "rm -f generated/version-info.ts /tmp/pvi-demo-bin/package-version-info"
+Type "rm -f /tmp/pvi-demo-bin/package-version-info"
 Enter

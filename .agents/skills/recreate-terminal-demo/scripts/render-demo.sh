@@ -48,12 +48,12 @@ git check-attr binary -- "$gif_path" | grep -q 'binary: set' || {
 }
 
 test ! -e generated/version-info.ts || {
-  echo "Tape cleanup failed: generated/version-info.ts still exists" >&2
+  echo "Dry-run created generated/version-info.ts" >&2
   exit 1
 }
 
 mkdir -p "$frames_dir"
-for sample in "3:help" "7:generate" "11.5:result"; do
+for sample in "3:help" "7:generate" "11:verbose" "17:dry-run"; do
   timestamp="${sample%%:*}"
   name="${sample#*:}"
   docker run --rm --entrypoint ffmpeg -v "$repo_root:/vhs" "$vhs_image" \
@@ -81,4 +81,5 @@ printf 'SHA-256: %s\n' "$checksum"
 printf 'Inspection frames:\n'
 printf '  %s/help.png\n' "$frames_dir"
 printf '  %s/generate.png\n' "$frames_dir"
-printf '  %s/result.png\n' "$frames_dir"
+printf '  %s/verbose.png\n' "$frames_dir"
+printf '  %s/dry-run.png\n' "$frames_dir"
