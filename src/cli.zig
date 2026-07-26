@@ -13,6 +13,7 @@ pub const GenerateOptions = struct {
     output_path: []const u8 = "version-info.ts",
     git_path: []const u8 = ".git",
     verbose: bool = false,
+    dry_run: bool = false,
 };
 
 pub const InvalidArgument = union(enum) {
@@ -37,6 +38,8 @@ pub fn parse(args: anytype) Action {
             return .version;
         } else if (std.mem.eql(u8, arg, "--verbose")) {
             options.verbose = true;
+        } else if (std.mem.eql(u8, arg, "--dry-run")) {
+            options.dry_run = true;
         } else if (std.mem.eql(u8, arg, "--input") or std.mem.eql(u8, arg, "-i")) {
             const value = args.next() orelse return .{ .invalid = .{ .missing_value = arg } };
             if (std.mem.startsWith(u8, value, "-")) return .{ .invalid = .{ .missing_value = arg } };
@@ -68,7 +71,9 @@ pub fn writeHelp(writer: anytype) !void {
             "\n  " ++ color.green ++ "-v, --version" ++ color.reset ++
             "                  Display current version." ++
             "\n      " ++ color.green ++ "--verbose" ++ color.reset ++
-            "                  Display detailed generation progress." ++
+            "                  Display detailed generation summary." ++
+            "\n      " ++ color.green ++ "--dry-run" ++ color.reset ++
+            "                  Print TypeScript without creating a file." ++
             "\n  " ++ color.green ++ "-i, --input <path>" ++ color.reset ++
             "             Input package.json (default: package.json)." ++
             "\n  " ++ color.green ++ "-o, --output <path>" ++ color.reset ++
@@ -114,6 +119,7 @@ test "no arguments generate with default paths" {
     try std.testing.expectEqualStrings("version-info.ts", options.output_path);
     try std.testing.expectEqualStrings(".git", options.git_path);
     try std.testing.expect(!options.verbose);
+    try std.testing.expect(!options.dry_run);
 }
 
 test "help flags show help" {
@@ -129,6 +135,7 @@ test "version flags show version" {
 test "generation options are parsed" {
     const action = parseTest(&.{
         "--verbose",
+        "--dry-run",
         "--input",
         "input.json",
         "-o",
@@ -141,11 +148,13 @@ test "generation options are parsed" {
     try std.testing.expectEqualStrings("generated/info.ts", options.output_path);
     try std.testing.expectEqualStrings("../.git", options.git_path);
     try std.testing.expect(options.verbose);
+    try std.testing.expect(options.dry_run);
 }
 
-test "verbose enables detailed generation progress" {
-    const options = parseTest(&.{"--verbose"}).generate;
+test "verbose dry run enables a detailed preview" {
+    const options = parseTest(&.{ "--verbose", "--dry-run" }).generate;
     try std.testing.expect(options.verbose);
+    try std.testing.expect(options.dry_run);
     try std.testing.expectEqualStrings("package.json", options.input_path);
 }
 
@@ -181,4 +190,5 @@ test "help contains usage commands and options" {
     try std.testing.expect(std.mem.indexOf(u8, help, " generate") == null);
     try std.testing.expect(std.mem.indexOf(u8, help, "--help") != null);
     try std.testing.expect(std.mem.indexOf(u8, help, "--verbose") != null);
+    try std.testing.expect(std.mem.indexOf(u8, help, "--dry-run") != null);
 }

@@ -2,10 +2,12 @@
 const std = @import("std");
 
 const embedded_package_json = @embedFile("package.json");
-const compact_summary_format = "✅ Generated {s} (v{s}, {d:.2}ms)";
+const compact_summary_format = "✓ Generated {s} • v{s} • {d:.2} ms";
 
 const color = struct {
     const reset = "\x1b[0m";
+    const bold = "\x1b[1m";
+    const dim = "\x1b[2m";
     const yellow = "\x1b[33m";
     const blue = "\x1b[34m";
     const cyan = "\x1b[36m";
@@ -27,14 +29,141 @@ fn writeCompactSummary(writer: anytype, output_path: []const u8, version: []cons
     try writer.print(compact_summary_format, .{ output_path, version, duration_ms });
 }
 
-fn logCompactSummary(output_path: []const u8, version: []const u8, duration_ms: f64) void {
-    std.debug.print("{s}" ++ compact_summary_format ++ "{s}\n", .{
-        color.bright_green,
+fn writeSeparator(writer: anytype) !void {
+    try writer.writeAll(" • ");
+}
+
+fn writeVerboseSummary(
+    writer: anytype,
+    package_json_path: []const u8,
+    output_path: []const u8,
+    version: []const u8,
+    date_str: []const u8,
+    author_info: ?AuthorInfo,
+    git_info: ?GitInfo,
+    summary_label: []const u8,
+    duration_ms: f64,
+) !void {
+    try writer.print("› Package    {s} • v{s}\n", .{ package_json_path, version });
+
+    try writer.writeAll("› Author     ");
+    if (author_info) |author| {
+        try writer.writeAll(author.name);
+        if (author.email.len > 0) {
+            try writeSeparator(writer);
+            try writer.writeAll(author.email);
+        }
+        if (author.url.len > 0) {
+            try writeSeparator(writer);
+            try writer.writeAll(author.url);
+        }
+    } else {
+        try writer.writeAll("Not found");
+    }
+
+    try writer.print("\n› Timestamp  {s}\n› Git        ", .{date_str});
+    if (git_info) |info| {
+        try writer.print("{s} • {s}", .{ info.branch, info.commit });
+    } else {
+        try writer.writeAll("Not a repository");
+    }
+
+    try writer.print("\n✓ {s:<11}{s} • v{s} • {d:.2} ms\n", .{
+        summary_label,
         output_path,
         version,
         duration_ms,
+    });
+}
+
+fn logSeparator() void {
+    std.debug.print(" {s}•{s} ", .{ color.dim, color.reset });
+}
+
+fn logVerbosePrefix(comptime marker: []const u8, accent: []const u8, label: []const u8) void {
+    std.debug.print("{s}{s}" ++ marker ++ "{s} {s}{s}{s:<11}{s}", .{
+        color.bold,
+        accent,
+        color.reset,
+        color.bold,
+        accent,
+        label,
         color.reset,
     });
+}
+
+fn logCompactSummary(output_path: []const u8, version: []const u8, duration_ms: f64) void {
+    std.debug.print("{s}{s}✓{s} Generated {s}{s}{s}{s} {s}•{s} {s}v{s}{s} {s}•{s} {s}{d:.2} ms{s}\n", .{
+        color.bold,
+        color.bright_green,
+        color.reset,
+        color.bold,
+        color.bright_cyan,
+        output_path,
+        color.reset,
+        color.dim,
+        color.reset,
+        color.bright_magenta,
+        version,
+        color.reset,
+        color.dim,
+        color.reset,
+        color.bright_blue,
+        duration_ms,
+        color.reset,
+    });
+}
+
+fn logVerboseSummary(
+    package_json_path: []const u8,
+    output_path: []const u8,
+    version: []const u8,
+    date_str: []const u8,
+    author_info: ?AuthorInfo,
+    git_info: ?GitInfo,
+    summary_label: []const u8,
+    duration_ms: f64,
+) void {
+    logVerbosePrefix("›", color.bright_cyan, "Package");
+    std.debug.print("{s}{s}{s}{s}", .{ color.bold, color.bright_cyan, package_json_path, color.reset });
+    logSeparator();
+    std.debug.print("{s}v{s}{s}\n", .{ color.bright_magenta, version, color.reset });
+
+    logVerbosePrefix("›", color.bright_blue, "Author");
+    if (author_info) |author| {
+        std.debug.print("{s}{s}{s}", .{ color.bright_blue, author.name, color.reset });
+        if (author.email.len > 0) {
+            logSeparator();
+            std.debug.print("{s}{s}{s}", .{ color.cyan, author.email, color.reset });
+        }
+        if (author.url.len > 0) {
+            logSeparator();
+            std.debug.print("{s}{s}{s}", .{ color.blue, author.url, color.reset });
+        }
+    } else {
+        std.debug.print("{s}Not found{s}", .{ color.yellow, color.reset });
+    }
+    std.debug.print("\n", .{});
+
+    logVerbosePrefix("›", color.cyan, "Timestamp");
+    std.debug.print("{s}{s}{s}\n", .{ color.cyan, date_str, color.reset });
+
+    logVerbosePrefix("›", color.bright_magenta, "Git");
+    if (git_info) |info| {
+        std.debug.print("{s}{s}{s}", .{ color.bright_magenta, info.branch, color.reset });
+        logSeparator();
+        std.debug.print("{s}{s}{s}", .{ color.bright_magenta, info.commit, color.reset });
+    } else {
+        std.debug.print("{s}Not a repository{s}", .{ color.yellow, color.reset });
+    }
+    std.debug.print("\n", .{});
+
+    logVerbosePrefix("✓", color.bright_green, summary_label);
+    std.debug.print("{s}{s}{s}{s}", .{ color.bold, color.bright_cyan, output_path, color.reset });
+    logSeparator();
+    std.debug.print("{s}v{s}{s}", .{ color.bright_magenta, version, color.reset });
+    logSeparator();
+    std.debug.print("{s}{d:.2} ms{s}\n", .{ color.bright_blue, duration_ms, color.reset });
 }
 
 /// Prints the tool's version from embedded package.json
@@ -71,6 +200,7 @@ pub const GitInfo = struct {
 
 pub const GenerateOptions = struct {
     verbose: bool = false,
+    dry_run: bool = false,
 };
 
 fn readFileAlloc(allocator: std.mem.Allocator, io: std.Io, path: []const u8, limit: std.Io.Limit) ![]u8 {
@@ -255,6 +385,41 @@ fn writeVersionInfo(writer: anytype, version: []const u8, date_str: []const u8, 
     try writer.writeAll("\n};\n");
 }
 
+const OutputDestination = union(enum) {
+    file: []const u8,
+    writer: *std.Io.Writer,
+};
+
+fn writeVersionInfoOutput(
+    io: std.Io,
+    destination: OutputDestination,
+    version: []const u8,
+    date_str: []const u8,
+    author_info: ?AuthorInfo,
+    git_info: ?GitInfo,
+) !void {
+    switch (destination) {
+        .file => |output_path| {
+            const cwd = std.Io.Dir.cwd();
+            if (std.fs.path.dirname(output_path)) |dir_path| {
+                try cwd.createDirPath(io, dir_path);
+            }
+
+            const output_file = try cwd.createFile(io, output_path, .{});
+            defer output_file.close(io);
+
+            var output_buffer: [4096]u8 = undefined;
+            var output_writer = output_file.writer(io, &output_buffer);
+            try writeVersionInfo(&output_writer.interface, version, date_str, author_info, git_info);
+            try output_writer.interface.flush();
+        },
+        .writer => |writer| {
+            try writeVersionInfo(writer, version, date_str, author_info, git_info);
+            try writer.flush();
+        },
+    }
+}
+
 /// Formats a Unix timestamp in milliseconds to ISO 8601 format (YYYY-MM-DDTHH:MM:SS.sssZ)
 fn formatTimestampISO8601(buffer: []u8, millis: i64) ![]const u8 {
     const epoch: std.time.epoch.EpochSeconds = .{
@@ -290,14 +455,6 @@ pub fn generateVersionInfoWithOptions(
     options: GenerateOptions,
 ) !void {
     const start_time = std.Io.Clock.awake.now(io);
-    if (options.verbose) {
-        logNewLine();
-        log(color.yellow, "🚀", "Starting version info generation...", .{});
-
-        logNewLine();
-        log(color.blue, "📖", "Reading {s}...", .{package_json_path});
-    }
-    const cwd = std.Io.Dir.cwd();
     const file_content = try readFileAlloc(allocator, io, package_json_path, .limited(1024 * 1024));
     defer allocator.free(file_content);
 
@@ -305,74 +462,51 @@ pub fn generateVersionInfoWithOptions(
     defer parsed.deinit();
 
     const version = parsed.value.object.get("version").?.string;
-    if (options.verbose) {
-        log(color.blue, "📦", "Version: {s}", .{version});
-
-        logNewLine();
-        log(color.bright_blue, "👤", "Reading author info...", .{});
-    }
     const author_info = getAuthor(parsed.value);
-    if (options.verbose) {
-        if (author_info) |author| {
-            log(color.bright_blue, "✍️ ", "Name: {s}", .{author.name});
-            if (author.email.len > 0) log(color.bright_blue, "📧", "Email: {s}", .{author.email});
-            if (author.url.len > 0) log(color.bright_blue, "🔗", "URL: {s}", .{author.url});
-        } else {
-            log(color.yellow, "⚠️ ", "No author info found in package.json", .{});
-        }
-
-        logNewLine();
-        log(color.cyan, "⏰", "Generating timestamp...", .{});
-    }
 
     const millis = std.Io.Clock.real.now(io).toMilliseconds();
     var date_buffer: [30]u8 = undefined;
     const date_str = try formatTimestampISO8601(&date_buffer, millis);
-    if (options.verbose) {
-        log(color.cyan, "📅", "Date: {s}", .{date_str});
-
-        logNewLine();
-        log(color.bright_magenta, "🌿", "Reading git info...", .{});
-    }
     const git_info = try getGitInfo(allocator, io, git_path);
     defer if (git_info) |info| info.deinit(allocator);
 
-    if (options.verbose) {
-        if (git_info) |info| {
-            log(color.bright_magenta, "📍", "Branch: {s}", .{info.branch});
-            log(color.bright_magenta, "🔖", "Commit: {s}", .{info.commit});
-        } else {
-            log(color.yellow, "⚠️ ", "Not a git repository (git info skipped)", .{});
-        }
-
-        logNewLine();
-        log(color.bright_green, "✍️ ", "Writing to {s}...", .{output_path});
+    if (options.dry_run) {
+        var output_buffer: [4096]u8 = undefined;
+        var output_writer = std.Io.File.stdout().writer(io, &output_buffer);
+        try writeVersionInfoOutput(
+            io,
+            .{ .writer = &output_writer.interface },
+            version,
+            date_str,
+            author_info,
+            git_info,
+        );
+    } else {
+        try writeVersionInfoOutput(
+            io,
+            .{ .file = output_path },
+            version,
+            date_str,
+            author_info,
+            git_info,
+        );
     }
-
-    if (std.fs.path.dirname(output_path)) |dir_path| {
-        try cwd.createDirPath(io, dir_path);
-    }
-
-    const output_file = try cwd.createFile(io, output_path, .{});
-    defer output_file.close(io);
-
-    var stdout_buffer: [1024]u8 = undefined;
-    var stdout_writer = output_file.writer(io, &stdout_buffer);
-    const writer = &stdout_writer.interface;
-
-    try writeVersionInfo(writer, version, date_str, author_info, git_info);
-
-    try writer.flush();
 
     const end_time = std.Io.Clock.awake.now(io);
     const duration_ns = start_time.durationTo(end_time).toNanoseconds();
     const duration_ms = @as(f64, @floatFromInt(duration_ns)) / std.time.ns_per_ms;
     if (options.verbose) {
-        log(color.bright_green, "✅", "Successfully generated {s}", .{output_path});
-        logNewLine();
-        log(color.yellow, "⏱️ ", "Duration: {d:.2}ms", .{duration_ms});
-        logNewLine();
-    } else {
+        logVerboseSummary(
+            package_json_path,
+            output_path,
+            version,
+            date_str,
+            author_info,
+            git_info,
+            if (options.dry_run) "Previewed" else "Generated",
+            duration_ms,
+        );
+    } else if (!options.dry_run) {
         logCompactSummary(output_path, version, duration_ms);
     }
 }
@@ -455,9 +589,141 @@ test "writes compact generation summary" {
 
     try writeCompactSummary(&output.writer, "generated/version-info.ts", "0.0.0", 2);
     try std.testing.expectEqualStrings(
-        "✅ Generated generated/version-info.ts (v0.0.0, 2.00ms)",
+        "✓ Generated generated/version-info.ts • v0.0.0 • 2.00 ms",
         output.writer.buffered(),
     );
+}
+
+test "writes complete verbose generation summary" {
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    try writeVerboseSummary(
+        &output.writer,
+        "package.json",
+        "generated/version-info.ts",
+        "1.2.3",
+        "2026-07-16T12:34:56.789Z",
+        .{ .name = "Name", .email = "mail@example.com", .url = "https://example.com" },
+        .{ .branch = "main", .commit = "abc123" },
+        "Generated",
+        2,
+    );
+
+    try std.testing.expectEqualStrings(
+        \\› Package    package.json • v1.2.3
+        \\› Author     Name • mail@example.com • https://example.com
+        \\› Timestamp  2026-07-16T12:34:56.789Z
+        \\› Git        main • abc123
+        \\✓ Generated  generated/version-info.ts • v1.2.3 • 2.00 ms
+        \\
+    , output.writer.buffered());
+}
+
+test "omits unavailable optional verbose author fields" {
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    try writeVerboseSummary(
+        &output.writer,
+        "package.json",
+        "version-info.ts",
+        "1.2.3",
+        "2026-07-16T12:34:56.789Z",
+        .{ .name = "Name", .email = "", .url = "" },
+        .{ .branch = "main", .commit = "abc123" },
+        "Generated",
+        2,
+    );
+
+    try std.testing.expect(std.mem.indexOf(u8, output.writer.buffered(), "› Author     Name\n") != null);
+    try std.testing.expect(std.mem.indexOf(u8, output.writer.buffered(), "Name •") == null);
+}
+
+test "describes missing verbose metadata" {
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    try writeVerboseSummary(
+        &output.writer,
+        "package.json",
+        "version-info.ts",
+        "1.2.3",
+        "2026-07-16T12:34:56.789Z",
+        null,
+        null,
+        "Generated",
+        2,
+    );
+
+    try std.testing.expect(std.mem.indexOf(u8, output.writer.buffered(), "› Author     Not found\n") != null);
+    try std.testing.expect(std.mem.indexOf(u8, output.writer.buffered(), "› Git        Not a repository\n") != null);
+}
+
+test "writes preview label in verbose dry run summary" {
+    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    defer output.deinit();
+
+    try writeVerboseSummary(
+        &output.writer,
+        "package.json",
+        "version-info.ts",
+        "1.2.3",
+        "2026-07-16T12:34:56.789Z",
+        null,
+        null,
+        "Previewed",
+        2,
+    );
+
+    try std.testing.expect(std.mem.indexOf(
+        u8,
+        output.writer.buffered(),
+        "✓ Previewed  version-info.ts • v1.2.3 • 2.00 ms\n",
+    ) != null);
+}
+
+test "writes TypeScript to a file or dry run writer" {
+    const allocator = std.testing.allocator;
+    const io = std.testing.io;
+
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+
+    var root_buffer: [std.Io.Dir.max_path_bytes]u8 = undefined;
+    const root_len = try tmp.dir.realPath(io, &root_buffer);
+    const root_path = root_buffer[0..root_len];
+    const output_path = try std.fs.path.join(allocator, &.{ root_path, "generated/version-info.ts" });
+    defer allocator.free(output_path);
+
+    var preview: std.Io.Writer.Allocating = .init(allocator);
+    defer preview.deinit();
+    try writeVersionInfoOutput(
+        io,
+        .{ .writer = &preview.writer },
+        "1.2.3",
+        "2026-07-16T12:34:56.789Z",
+        null,
+        null,
+    );
+
+    try std.testing.expectError(error.FileNotFound, tmp.dir.openDir(io, "generated", .{}));
+    try std.testing.expect(std.mem.startsWith(u8, preview.writer.buffered(), "/**\n"));
+    try std.testing.expect(std.mem.indexOf(u8, preview.writer.buffered(), "version: \"1.2.3\"") != null);
+    try std.testing.expect(std.mem.indexOf(u8, preview.writer.buffered(), "✓") == null);
+
+    try writeVersionInfoOutput(
+        io,
+        .{ .file = output_path },
+        "1.2.3",
+        "2026-07-16T12:34:56.789Z",
+        null,
+        null,
+    );
+
+    const file_content = try readFileAlloc(allocator, io, output_path, .limited(1024 * 1024));
+    defer allocator.free(file_content);
+    try std.testing.expectEqualStrings(preview.writer.buffered(), file_content);
 }
 
 test "writes complete TypeScript file" {

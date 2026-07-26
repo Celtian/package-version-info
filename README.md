@@ -55,7 +55,7 @@ npx package-version-info --output src/version-info.ts
 ```
 
 ```text
-✅ Generated src/version-info.ts (v1.0.0, 2.00ms)
+✓ Generated src/version-info.ts • v1.0.0 • 2.00 ms
 ```
 
 ### 3. Import it
@@ -107,7 +107,8 @@ npx package-version-info
 | --- | --- | --- | --- |
 | `--help` | `-h` | — | Display usage information. |
 | `--version` | `-v` | — | Display the installed package version. |
-| `--verbose` | — | Disabled | Display detailed generation progress. |
+| `--verbose` | — | Disabled | Display a detailed generation summary. |
+| `--dry-run` | — | Disabled | Print TypeScript without creating a file. |
 | `--input <path>` | `-i` | `package.json` | Input package file. |
 | `--output <path>` | `-o` | `version-info.ts` | Generated TypeScript file. |
 | `--git <path>` | `-g` | `.git` | Git directory or pointer file used for branch and commit metadata. |
@@ -123,6 +124,12 @@ npx package-version-info
 
 # Show detailed progress
 npx package-version-info --verbose
+
+# Preview generated TypeScript without creating a file
+npx package-version-info --dry-run
+
+# Pipe the preview to another command
+npx package-version-info --dry-run | less
 
 # Use custom paths
 npx package-version-info \
@@ -142,7 +149,7 @@ npx package-version-info \
 Compact mode is designed for normal builds:
 
 ```text
-✅ Generated src/version-info.ts (v1.0.0, 2.00ms)
+✓ Generated src/version-info.ts • v1.0.0 • 2.00 ms
 ```
 
 Use verbose mode when diagnosing package, author, timestamp, Git, or output-path behavior:
@@ -150,6 +157,27 @@ Use verbose mode when diagnosing package, author, timestamp, Git, or output-path
 ```bash
 npx package-version-info --verbose
 ```
+
+```text
+› Package    package.json • v1.0.0
+› Author     Dominik Hladík • dominik.hladik@seznam.cz • https://github.com/Celtian
+› Timestamp  2026-07-16T18:53:01.908Z
+› Git        main • 8be6ca60256cc90e0a41d40b9ee222165f239444
+✓ Generated  version-info.ts • v1.0.0 • 2.00 ms
+```
+
+### Dry-run preview
+
+Use `--dry-run` to print the generated TypeScript to stdout without creating the configured output
+file or its parent directories:
+
+```bash
+npx package-version-info --dry-run
+```
+
+The stdout stream contains only TypeScript, with no colors or status text, so it can be redirected
+or piped directly. Combining `--verbose` with `--dry-run` keeps the TypeScript on stdout and writes
+the colored diagnostic summary to stderr, ending with `✓ Previewed`.
 
 ## 🛠️ Build-tool integration
 

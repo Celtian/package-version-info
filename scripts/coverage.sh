@@ -25,6 +25,17 @@ kcov \
   "$coverage_dir/root" \
   "$coverage_dir/cli"
 
+coverage_xml="$coverage_dir/merged/kcov-merged/cobertura.xml"
+
 sed -i \
   's/ branch-rate="[^"]*" branches-covered="[^"]*" branches-rate="[^"]*"/ branch-rate="0" branches-covered="0" branches-valid="0"/' \
-  "$coverage_dir/merged/kcov-merged/cobertura.xml"
+  "$coverage_xml"
+
+line_rate=$(sed -n 's/^<coverage line-rate="\([^"]*\)".*/\1/p' "$coverage_xml")
+test -n "$line_rate"
+
+awk -v line_rate="$line_rate" 'BEGIN {
+  minimum = 0.95
+  printf "Line coverage: %.2f%% (minimum: %.2f%%)\n", line_rate * 100, minimum * 100
+  if (line_rate < minimum) exit 1
+}'
