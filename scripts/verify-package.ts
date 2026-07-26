@@ -19,7 +19,7 @@ for (const platform of platforms) {
 }
 
 const versionResult = spawnSync(
-  process.execPath,
+  'node',
   [join(distDir, 'bin', 'package-version-info.js'), '--version'],
   { encoding: 'utf8' },
 );
@@ -32,7 +32,7 @@ try {
   writeFileSync(join(testDir, 'package.json'), JSON.stringify({ name: 'smoke-test', version: '1.2.3' }));
   const outputPath = join(testDir, 'version-info.ts');
   const result = spawnSync(
-    process.execPath,
+    'node',
     [join(distDir, 'bin', 'package-version-info.js'), '--output', outputPath, '--git', join(testDir, '.git')],
     { cwd: testDir, encoding: 'utf8' },
   );
