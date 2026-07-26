@@ -6,8 +6,6 @@ zig-out/
 # Node.js artifacts
 node_modules/
 npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
 package-lock.json
 
 # Visual Studio Code

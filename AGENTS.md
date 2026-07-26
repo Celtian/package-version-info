@@ -5,12 +5,12 @@
 - This repository provides a Zig library and CLI that generate TypeScript version information from `package.json`.
 - `src/root.zig` contains the public `version_info` library API.
 - `src/main.zig` contains the CLI entry point and argument parsing.
-- Node.js and Yarn are used for packaging and publishing; the runtime executable is Zig.
+- Node.js and Bun are used for packaging, npm is used for publishing, and the runtime executable is Zig.
 
 ## Toolchain
 
 - Use Zig 0.16.0. Prefer ZVM: `zvm install 0.16.0` followed by `zvm use 0.16.0`.
-- Use Yarn 1.22.22 with Node.js 24.
+- Use Bun 1.3.14 with Node.js 24.
 - Keep the Zig version synchronized in `build.zig.zon`, `README.md`, and every workflow under `.github/workflows/`.
 - When upgrading toolchains, search hidden files too: `rg --hidden '<old-version>' . --glob '!.git/**'`.
 - Never change the `build.zig.zon` package fingerprint.
@@ -30,17 +30,17 @@
 Before handing off any Zig source, build configuration, dependency, packaging script, CI, or toolchain change, MUST run:
 
 ```bash
-yarn validate
+bun run validate
 ```
 
-- `yarn validate` is the canonical validation command. It runs formatting checks, `zig build`, and `zig build test`.
+- `bun run validate` is the canonical validation command. It runs formatting checks, `zig build`, and `zig build test`.
 - MUST run formatting checks on every changed Zig file. Keep `format:check` synchronized when Zig files are added or renamed.
 - Run `zig build` separately because `zig build test` does not fully analyze the CLI `main` function.
 - Behavior changes MUST include new or updated tests where practical.
 - If the global Zig cache is not writable, set `ZIG_GLOBAL_CACHE_DIR` to a directory under `/tmp`.
 - For CLI changes, also smoke-test `--version`, generation with a real `.git` directory, and generation with a missing Git directory.
 - Write smoke-test output outside the repository so generated artifacts are not accidentally committed.
-- Documentation-only changes do not require `yarn validate` unless they change commands, versions, build instructions, or other executable examples.
+- Documentation-only changes do not require `bun run validate` unless they change commands, versions, build instructions, or other executable examples.
 - MUST NOT weaken, remove, or skip tests merely to make validation pass.
 - MUST NOT report a command as passing unless it was actually executed successfully.
 - If a required command cannot run, report the exact command, failure, and remaining unverified behavior.

@@ -30,7 +30,7 @@ accurate, readable, compact, and safe to commit.
 6. Run:
 
    ```bash
-   ZIG_GLOBAL_CACHE_DIR=/tmp/package-version-info-zig-cache yarn validate
+   ZIG_GLOBAL_CACHE_DIR=/tmp/package-version-info-zig-cache bun run validate
    git diff --check
    git diff --cached --check
    ```

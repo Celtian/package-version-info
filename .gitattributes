@@ -2,5 +2,4 @@
 *.png binary
 *.gif binary
 
-yarn.lock -diff
 package-lock.json -diff

@@ -41,7 +41,7 @@ npm install package-version-info --save-dev
 ```
 
 ```bash
-yarn add package-version-info --dev
+bun add --dev package-version-info
 ```
 
 The npm package includes native executables for macOS arm64/x64, Linux arm64/x64, and Windows
@@ -202,7 +202,7 @@ Requirements:
 
 - [Zig 0.16.0](https://ziglang.org/download/)
 - Node.js 24
-- Yarn 1.22.22
+- Bun 1.3.14
 
 ```bash
 # Build the executable
@@ -212,7 +212,7 @@ zig build
 zig build run
 
 # Run all formatting, build, and test checks
-yarn validate
+bun run validate
 ```
 
 <details>

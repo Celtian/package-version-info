@@ -10,30 +10,30 @@
   "private": false,
   "description": "Generate version info from package.json for TypeScript projects",
   "scripts": {
-    "validate": "yarn format:check && yarn test:launcher && yarn build && yarn test",
+    "validate": "bun run format:check && bun run test:launcher && bun run build && bun run test",
     "format:check": "zig fmt --check src/root.zig src/main.zig src/cli.zig build.zig",
     "build": "zig build",
-    "build:platforms": "yarn script:package-zig && yarn tsx ./scripts/build-platforms.ts",
+    "build:platforms": "bun run script:package-zig && bun run tsx ./scripts/build-platforms.ts",
     "start": "zig build run",
     "test": "zig build test",
     "test:launcher": "node --test ./scripts/package-version-info.test.cjs",
-    "test:package": "yarn tsx ./scripts/verify-package.ts",
+    "test:package": "bun run tsx ./scripts/verify-package.ts",
     "coverage:build": "rimraf coverage zig-out/coverage-tests && zig build coverage",
     "clean": "rimraf zig-out dist",
     "prepare": "husky",
-    "package": "yarn build:platforms && yarn script:package-npm && yarn test:package",
-    "postinstall": "yarn script:package-zig",
-    "script:package-zig": "yarn tsx ./scripts/package-zig.ts",
-    "script:package-npm": "yarn tsx ./scripts/package-npm.ts",
-    "script:package-github": "yarn tsx ./scripts/package-github.ts",
+    "package": "bun run build:platforms && bun run script:package-npm && bun run test:package",
+    "postinstall": "bun run script:package-zig",
+    "script:package-zig": "bun run tsx ./scripts/package-zig.ts",
+    "script:package-npm": "bun run tsx ./scripts/package-npm.ts",
+    "script:package-github": "bun run tsx ./scripts/package-github.ts",
     "version": "auto-changelog -p && git add CHANGELOG.md",
     "postversion": "git push && git push --follow-tags",
-    "publish:beta": "yarn && yarn validate && yarn package && npm publish --folder dist --tag beta",
+    "publish:beta": "bun install && bun run validate && bun run package && npm publish --folder dist --tag beta",
     "release:beta": "npm version prerelease -m \"chore(update): prelease %s β\"",
     "release:patch": "git checkout master && npm version patch -m \"chore(update): patch release %s 🐛 \"",
     "release:minor": "git checkout master && npm version minor -m \"chore(update): release %s 🚀\"",
     "release:major": "git checkout master && npm version major -m \"chore(update): major release %s 💥 \"",
-    "fix-vulnerabilities": "npx yarn-audit-fix && npx browserslist --update-db"
+    "fix-vulnerabilities": "bun update && bun audit"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.1",
@@ -49,10 +49,9 @@
   "bin": {
     "package-version-info": "zig-out/bin/version_info"
   },
-  "packageManager": "yarn@1.22.22",
+  "packageManager": "bun@1.3.14",
   "engines": {
-    "node": ">=24 <26",
-    "npm": "please-use-yarn"
+    "node": ">=24 <26"
   },
   "homepage": "https://github.com/Celtian/package-version-info",
   "repository": {
