@@ -22,8 +22,11 @@ jobs:
       - name: 🗜️ Setup node version
         uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version-file: ".nvmrc"
           registry-url: "https://registry.npmjs.org"
+
+      - name: 🗜️ Setup Bun
+        uses: oven-sh/setup-bun@v2
 
       - name: 🗜️ Setup Zig
         uses: mlugg/setup-zig@v2
@@ -34,13 +37,13 @@ jobs:
         uses: ./.github/actions/cached-deps
 
       - name: 🛠️ Clean temporary files
-        run: yarn clean
+        run: bun run clean
 
       - name: ✅ Validate
-        run: yarn validate
+        run: bun run validate
 
       - name: 🛠️ Build cross-platform package
-        run: yarn package
+        run: bun run package
 
       - name: 🚀 Publish NPM
         if: startsWith(github.ref, 'refs/tags/v') && contains(github.ref, 'beta') == false
@@ -56,13 +59,13 @@ jobs:
 
       - name: 🛠️ Set up package for GPR
         if: startsWith(github.ref, 'refs/tags/v') && contains(github.ref, 'beta') == false
-        run: yarn script:package-github
+        run: bun run script:package-github
 
       - name: 🛠️ Use GPR
         if: startsWith(github.ref, 'refs/tags/v') && contains(github.ref, 'beta') == false
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version-file: ".nvmrc"
           registry-url: https://npm.pkg.github.com/
           scope: "@celtian"
 

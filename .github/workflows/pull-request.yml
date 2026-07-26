@@ -5,10 +5,6 @@ permissions:
   contents: read
   pull-requests: write
 
-env:
-  # kcov/kcov:latest, pinned for reproducible builds
-  KCOV_IMAGE: kcov/kcov@sha256:481289ae32e55e5b733019515acd10948a4f76dfed381765577db909664fc603
-
 jobs:
   install-and-test:
     name: 🛠️ Install & Test
@@ -21,8 +17,11 @@ jobs:
       - name: 🗜️ Setup node version
         uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version-file: ".nvmrc"
           registry-url: "https://registry.npmjs.org"
+
+      - name: 🗜️ Setup Bun
+        uses: oven-sh/setup-bun@v2
 
       - name: 🗜️ Setup Zig
         uses: mlugg/setup-zig@v2
@@ -33,25 +32,16 @@ jobs:
         uses: ./.github/actions/cached-deps
 
       - name: 🛠️ Clean temporary files
-        run: yarn clean
+        run: bun run clean
 
       - name: ✅ Validate
-        run: yarn validate
+        run: bun run validate
 
       - name: 🛠️ Build coverage tests
-        run: yarn coverage:build
+        run: bun run coverage:build
 
       - name: 🧪 Generate coverage
-        run: |
-          docker run --rm \
-            --cap-add=SYS_PTRACE \
-            --security-opt seccomp=unconfined \
-            --volume "$PWD:$PWD" \
-            --workdir "$PWD" \
-            --user "$(id -u):$(id -g)" \
-            --entrypoint /bin/sh \
-            "$KCOV_IMAGE" \
-            "$PWD/scripts/coverage.sh"
+        uses: ./.github/actions/generate-coverage
 
       - name: 📊 Report coverage
         if: github.event.pull_request.head.repo.full_name == github.repository
@@ -60,7 +50,7 @@ jobs:
           coverage-file: coverage/merged/kcov-merged/cobertura.xml
 
       - name: 🛠️ Build cross-platform package
-        run: yarn package
+        run: bun run package
 
   package-smoke-test:
     name: 📦 Package Smoke Test (${{ matrix.os }})
@@ -77,7 +67,10 @@ jobs:
       - name: 🗜️ Setup node version
         uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version-file: ".nvmrc"
+
+      - name: 🗜️ Setup Bun
+        uses: oven-sh/setup-bun@v2
 
       - name: 🗜️ Setup Zig
         uses: mlugg/setup-zig@v2
@@ -90,7 +83,7 @@ jobs:
           caching: "false"
 
       - name: 🛠️ Build cross-platform package
-        run: yarn package
+        run: bun run package
 
       - name: 🧪 Run packaged CLI
         run: node dist/bin/package-version-info.js --version

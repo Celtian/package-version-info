@@ -39,7 +39,7 @@ chmodSync(launcherPath, 0o755);
 for (const platform of platforms) {
   const source = join(rootDir, 'zig-out', 'platforms', platform.id, 'bin', platform.binary);
   if (!pathExistsSync(source)) {
-    throw new Error(`Missing ${platform.id} binary. Run \"yarn build:platforms\" first.`);
+    throw new Error(`Missing ${platform.id} binary. Run \"bun run build:platforms\" first.`);
   }
 
   const nativeDir = join(binDir, 'native', platform.id);
@@ -50,4 +50,3 @@ for (const platform of platforms) {
 }
 
 console.log('\x1b[34m', 'Cross-platform npm package created in dist/.', '\x1b[0m');
-
