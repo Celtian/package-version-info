@@ -10,7 +10,7 @@
 ## Toolchain
 
 - Use Zig 0.16.0. Prefer ZVM: `zvm install 0.16.0` followed by `zvm use 0.16.0`.
-- Use Bun 1.3.14 with Node.js 24.
+- Use Bun 1.4.4 with Node.js 24.
 - Keep the Zig version synchronized in `build.zig.zon`, `README.md`, and every workflow under `.github/workflows/`.
 - When upgrading toolchains, search hidden files too: `rg --hidden '<old-version>' . --glob '!.git/**'`.
 - Never change the `build.zig.zon` package fingerprint.

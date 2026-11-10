@@ -202,7 +202,7 @@ Requirements:
 
 - [Zig 0.16.0](https://ziglang.org/download/)
 - Node.js 24
-- Bun 1.3.14
+- Bun 1.4.4
 
 ```bash
 # Build the executable
